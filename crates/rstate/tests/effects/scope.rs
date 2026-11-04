@@ -89,3 +89,29 @@ fn failed_effect_loops_keep_retained_scopes_pinned_and_skip_later_effects() {
         1
     );
 }
+
+#[test]
+fn retained_scope_debug_reports_completion_without_replaying_effects() {
+    let retained = Rc::new(RefCell::new(None::<EffectScope<i32, Event>>));
+    let retained_scope = retained.clone();
+    let calls = Rc::new(RefCell::new(0));
+    let effect_calls = calls.clone();
+    let store =
+        Store::<i32, Event>::new(StoreConfig::new(0, move |context: &Rc<i32>, _, enqueue| {
+            let retained = retained_scope.clone();
+            let calls = effect_calls.clone();
+            enqueue.effect(move |scope| {
+                assert!(format!("{scope:?}").contains("completed: false"));
+                *calls.borrow_mut() += 1;
+                retained.replace(Some(scope));
+                Ok(())
+            });
+            Ok(Update::replace(**context + 1))
+        }));
+
+    store.send(Event::Start).unwrap();
+    let scope = retained.borrow().as_ref().unwrap().clone();
+
+    assert!(format!("{scope:#?}").contains("completed: true"));
+    assert_eq!(*calls.borrow(), 1);
+}

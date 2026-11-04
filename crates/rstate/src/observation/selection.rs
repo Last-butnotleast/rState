@@ -1,4 +1,4 @@
-use std::{any::Any, cell::RefCell, rc::Rc};
+use std::{any::Any, cell::RefCell, fmt, rc::Rc};
 
 use crate::{StoreResult, Subscription};
 
@@ -13,6 +13,22 @@ pub struct Selection<T> {
     attach: Rc<Attach>,
     upstream: Rc<RefCell<Option<Subscription>>>,
     source: Rc<dyn Any>,
+}
+
+impl<T> fmt::Debug for Selection<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let observed = self
+            .upstream
+            .try_borrow()
+            .map(|upstream| upstream.is_some())
+            .ok();
+        let mut debug = f.debug_struct("Selection");
+        match observed {
+            Some(observed) => debug.field("observed", &observed),
+            None => debug.field("observed", &"<borrowed>"),
+        };
+        debug.finish_non_exhaustive()
+    }
 }
 
 impl<T> Clone for Selection<T> {

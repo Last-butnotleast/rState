@@ -54,3 +54,24 @@ fn explicit_unsubscribe_is_idempotent_and_prevents_later_delivery() {
 
     assert_eq!(*values.borrow(), [1]);
 }
+
+#[test]
+fn subscription_debug_reports_activity_without_running_or_canceling_callbacks() {
+    let store = counter();
+    let values = Rc::new(RefCell::new(Vec::new()));
+    let observed = values.clone();
+    let subscription = store.subscribe(move |snapshot| {
+        observed.borrow_mut().push(snapshot.context.count);
+        Ok(())
+    });
+
+    assert!(format!("{subscription:?}").contains("active: true"));
+    assert!(values.borrow().is_empty());
+    store.send(Event::Add(1)).unwrap();
+    assert_eq!(*values.borrow(), [1]);
+
+    subscription.unsubscribe();
+
+    assert!(format!("{subscription:#?}").contains("active: false"));
+    assert_eq!(*values.borrow(), [1]);
+}

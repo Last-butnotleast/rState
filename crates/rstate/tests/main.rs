@@ -1,4 +1,5 @@
 mod effects;
+mod error;
 mod observation;
 mod state;
 mod store;

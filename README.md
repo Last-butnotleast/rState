@@ -41,7 +41,7 @@ assert!(!store.can(Event::Keep).unwrap());
 subscription.unsubscribe();
 ```
 
-Reducers return `StoreResult<Update<Context>>`. Use `StoreError::new` for a callback failure or `StoreError::from_error` to retain an application error as its source. Callback failures are recoverable results; Rust panics are programming faults rather than JavaScript-compatible exceptions.
+Reducers return `StoreResult<Update<Context>>`. Use `StoreError::new` for a callback failure or `StoreError::from_error` to retain an application error as its direct source, including its existing source chain. External errors must implement `Error + Send + Sync + 'static`, so `StoreError` can propagate into application error containers such as `Box<dyn Error + Send + Sync>` or `anyhow::Error`. These bounds apply to external errors, not to store contexts, events or callbacks. Callback failures are recoverable results; Rust panics are programming faults rather than JavaScript-compatible exceptions.
 
 `Update::Keep` retains context and snapshot identity. `Update::Replace` replaces the complete context; equal contents do not imply equal identity. Returning the existing context handle preserves snapshot identity while making `can` true. Contexts, events and selected values do not need `Clone`, `Serialize`, `Send` or `Sync`.
 

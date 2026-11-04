@@ -129,3 +129,28 @@ fn selected_callbacks_can_send_and_reconcile_before_the_nested_send_returns() {
     );
     assert_eq!(*selected.get(), 2);
 }
+
+#[test]
+fn selection_debug_does_not_evaluate_or_observe_a_non_debug_value() {
+    let store = store();
+    let calls = Rc::new(RefCell::new(0));
+    let computations = calls.clone();
+    let selected = store.select(
+        move |context| {
+            *computations.borrow_mut() += 1;
+            Selected {
+                count: context.count,
+            }
+        },
+        |left, right| left.count == right.count,
+    );
+
+    assert!(format!("{selected:?}").contains("Selection"));
+    assert_eq!(*calls.borrow(), 0);
+
+    let subscription = selected.subscribe(|_| Ok(()));
+    assert_eq!(*calls.borrow(), 1);
+    assert!(format!("{selected:#?}").contains("Selection"));
+    assert_eq!(*calls.borrow(), 1);
+    subscription.unsubscribe();
+}

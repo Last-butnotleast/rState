@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{fmt, rc::Rc};
 
 use crate::{Enqueue, StoreResult, Update};
 
@@ -8,6 +8,14 @@ pub(crate) type Reducer<C, E, M> =
 pub struct StoreConfig<C, E, M = ()> {
     pub(crate) initial: Rc<C>,
     pub(crate) reducer: Rc<Reducer<C, E, M>>,
+}
+
+impl<C: fmt::Debug, E, M> fmt::Debug for StoreConfig<C, E, M> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("StoreConfig")
+            .field("initial", &self.initial)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<C, E, M> StoreConfig<C, E, M> {

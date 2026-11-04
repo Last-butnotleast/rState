@@ -87,3 +87,27 @@ fn failure_in_an_internal_trigger_discards_the_whole_uncommitted_macrostep() {
     assert_eq!(*store.get_snapshot().context, 0);
     assert!(trace.borrow().is_empty());
 }
+
+#[test]
+fn enqueue_debug_summarizes_non_debug_events_messages_and_captures() {
+    struct Context;
+    struct Event;
+    struct Message;
+
+    let calls = Rc::new(RefCell::new(0));
+    let effect_calls = calls.clone();
+    let mut enqueue = rstate::Enqueue::<Context, Event, Message>::default();
+    enqueue.trigger(Event);
+    enqueue.emit(Message);
+    enqueue.effect(move |_| {
+        *effect_calls.borrow_mut() += 1;
+        Ok(())
+    });
+
+    let debug = format!("{enqueue:#?}");
+
+    assert!(debug.contains("queued_events: 1"));
+    assert!(debug.contains("Run"));
+    assert!(debug.contains("Emit"));
+    assert_eq!(*calls.borrow(), 0);
+}

@@ -1,7 +1,15 @@
-use std::{cell::Cell, rc::Rc};
+use std::{cell::Cell, fmt, rc::Rc};
 
 pub struct Subscription {
     inner: Rc<SubscriptionInner>,
+}
+
+impl fmt::Debug for Subscription {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Subscription")
+            .field("active", &self.inner.active.get())
+            .finish_non_exhaustive()
+    }
 }
 
 struct SubscriptionInner {

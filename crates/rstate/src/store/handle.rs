@@ -1,10 +1,27 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, fmt, rc::Rc};
 
 use crate::{Snapshot, StoreConfig, StoreResult, Subscription};
 use crate::{observation::Emissions, observation::Observers, transition::Reducer};
 
 pub struct Store<C, E, M = ()> {
     pub(crate) inner: Rc<StoreInner<C, E, M>>,
+}
+
+impl<C: fmt::Debug, E, M> fmt::Debug for Store<C, E, M> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let current = self
+            .inner
+            .current
+            .try_borrow()
+            .map(|snapshot| snapshot.clone())
+            .ok();
+        let mut debug = f.debug_struct("Store");
+        match current {
+            Some(snapshot) => debug.field("current", &snapshot),
+            None => debug.field("current", &"<borrowed>"),
+        };
+        debug.finish_non_exhaustive()
+    }
 }
 
 pub(crate) struct StoreInner<C, E, M> {

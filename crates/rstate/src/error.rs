@@ -4,8 +4,8 @@ use std::error::Error;
 pub enum StoreError {
     #[error("{0}")]
     Callback(String),
-    #[error(transparent)]
-    External(Box<dyn Error>),
+    #[error("{0}")]
+    External(#[source] Box<dyn Error + Send + Sync>),
 }
 
 impl StoreError {
@@ -13,7 +13,7 @@ impl StoreError {
         Self::Callback(message.into())
     }
 
-    pub fn from_error(error: impl Error + 'static) -> Self {
+    pub fn from_error(error: impl Error + Send + Sync + 'static) -> Self {
         Self::External(Box::new(error))
     }
 }

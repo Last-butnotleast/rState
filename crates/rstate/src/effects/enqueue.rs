@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{fmt, rc::Rc};
 
 use crate::{EffectScope, StoreResult};
 
@@ -9,9 +9,27 @@ pub enum Effect<C, E, M = ()> {
     Run(Box<EffectCallback<C, E, M>>),
 }
 
+impl<C, E, M> fmt::Debug for Effect<C, E, M> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Emit(_) => f.write_str("Emit(..)"),
+            Self::Run(_) => f.write_str("Run(..)"),
+        }
+    }
+}
+
 pub struct Enqueue<C, E, M = ()> {
     pub(crate) events: Vec<E>,
     pub(crate) effects: Vec<Effect<C, E, M>>,
+}
+
+impl<C, E, M> fmt::Debug for Enqueue<C, E, M> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Enqueue")
+            .field("queued_events", &self.events.len())
+            .field("effects", &self.effects)
+            .finish()
+    }
 }
 
 impl<C, E, M> Default for Enqueue<C, E, M> {
