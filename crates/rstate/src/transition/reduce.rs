@@ -4,7 +4,7 @@ use crate::{Enqueue, Snapshot, StoreResult, TransitionResult, Update};
 
 use super::Reducer;
 
-pub(crate) fn reduce<C, E, M>(
+pub fn reduce<C, E, M>(
     reducer: &Reducer<C, E, M>,
     snapshot: Rc<Snapshot<C>>,
     event: E,

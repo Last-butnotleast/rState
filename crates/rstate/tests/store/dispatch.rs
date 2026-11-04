@@ -35,7 +35,7 @@ fn context_updates_replace_the_whole_context() {
             count: 0,
             label: Some("initial"),
         },
-        |_, _, _| {
+        |_, (), _| {
             Ok(Update::replace(Context {
                 count: 1,
                 label: None,

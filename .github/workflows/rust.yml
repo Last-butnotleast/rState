@@ -1,0 +1,30 @@
+name: Rust
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install the repository Rust toolchain
+        run: rustup show active-toolchain
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Check workspace lints
+        run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+      - name: Check WebAssembly lints
+        run: cargo clippy --locked -p rstate-wasm --target wasm32-unknown-unknown --all-features -- -D warnings
+      - name: Test the workspace
+        run: cargo test --locked --workspace --all-features

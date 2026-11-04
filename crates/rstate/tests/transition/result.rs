@@ -9,6 +9,10 @@ enum Event {
 
 struct Message;
 
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "the fixture uses bounded counter inputs"
+)]
 fn store(runs: Rc<Cell<usize>>) -> Store<i32, Event, Message> {
     Store::new(StoreConfig::new(0, move |_, event, enqueue| {
         match event {

@@ -2,8 +2,7 @@ use std::{fmt, rc::Rc};
 
 use crate::{Enqueue, StoreResult, Update};
 
-pub(crate) type Reducer<C, E, M> =
-    dyn Fn(&Rc<C>, &E, &mut Enqueue<C, E, M>) -> StoreResult<Update<C>>;
+pub type Reducer<C, E, M> = dyn Fn(&Rc<C>, &E, &mut Enqueue<C, E, M>) -> StoreResult<Update<C>>;
 
 pub struct StoreConfig<C, E, M = ()> {
     pub(crate) initial: Rc<C>,

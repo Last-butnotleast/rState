@@ -18,6 +18,10 @@ enum Event {
     Label,
 }
 
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "the fixture uses bounded counter inputs"
+)]
 fn store() -> Store<Context, Event> {
     Store::new(StoreConfig::new(
         Context {

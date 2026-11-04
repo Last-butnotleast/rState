@@ -77,7 +77,7 @@ impl Node {
 }
 
 #[derive(Clone, Default)]
-pub(crate) struct Observers {
+pub struct Observers {
     inner: Rc<ObserverEntries>,
 }
 

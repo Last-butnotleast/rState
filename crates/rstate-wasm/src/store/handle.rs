@@ -42,14 +42,14 @@ impl FixtureStore {
     pub fn snapshot(&self) -> String {
         self.identities
             .borrow_mut()
-            .snapshot(self.store.get_snapshot())
+            .snapshot(&self.store.get_snapshot())
             .to_string()
     }
 
     pub fn initial_snapshot(&self) -> String {
         self.identities
             .borrow_mut()
-            .snapshot(self.store.get_initial_snapshot())
+            .snapshot(&self.store.get_initial_snapshot())
             .to_string()
     }
 
@@ -58,37 +58,46 @@ impl FixtureStore {
             .store
             .transition(self.store.get_snapshot(), parse(event)?)
             .map_err(|value| error(&value))?;
-        let snapshot = self.identities.borrow_mut().snapshot(result.snapshot);
+        let snapshot = self.identities.borrow_mut().snapshot(&result.snapshot);
         Ok(json!({"snapshot": snapshot, "effects": result.effects.len(), "allowed": result.allowed}).to_string())
     }
 
-    pub fn subscribe(&self, callback: Function) -> u32 {
+    pub fn subscribe(&self, callback: Function) -> Result<u32, JsValue> {
+        let id = self.next_id()?;
         let identities = self.identities.clone();
         let subscription = self.store.subscribe(move |snapshot| {
-            let value = identities.borrow_mut().snapshot(snapshot);
+            let value = identities.borrow_mut().snapshot(&snapshot);
             invoke(&callback, &value)
         });
-        self.register(subscription)
+        Ok(self.register(id, subscription))
     }
 
-    pub fn on_any(&self, callback: Function) -> u32 {
-        self.register(self.store.on_any(move |message| {
-            invoke(
-                &callback,
-                &serde_json::to_value(message.as_ref()).map_err(StoreError::from_error)?,
-            )
-        }))
-    }
-
-    pub fn on_receipt(&self, callback: Function) -> u32 {
-        self.register(self.store.on(
-            |message| matches!(message, Message::Receipt { .. }),
-            move |message| {
+    pub fn on_any(&self, callback: Function) -> Result<u32, JsValue> {
+        let id = self.next_id()?;
+        Ok(self.register(
+            id,
+            self.store.on_any(move |message| {
                 invoke(
                     &callback,
                     &serde_json::to_value(message.as_ref()).map_err(StoreError::from_error)?,
                 )
-            },
+            }),
+        ))
+    }
+
+    pub fn on_receipt(&self, callback: Function) -> Result<u32, JsValue> {
+        let id = self.next_id()?;
+        Ok(self.register(
+            id,
+            self.store.on(
+                |message| matches!(message, Message::Receipt { .. }),
+                move |message| {
+                    invoke(
+                        &callback,
+                        &serde_json::to_value(message.as_ref()).map_err(StoreError::from_error)?,
+                    )
+                },
+            ),
         ))
     }
 
@@ -98,11 +107,15 @@ impl FixtureStore {
             "total" => true,
             _ => return Err(JsValue::from_str("unknown selection")),
         };
+        let id = self.next_id()?;
         let selection = self.store.select(
             move |context| if total { context.total } else { context.count },
             |left, right| left == right,
         );
-        Ok(self.register(selection.subscribe(move |value| invoke(&callback, &json!(*value)))))
+        Ok(self.register(
+            id,
+            selection.subscribe(move |value| invoke(&callback, &json!(*value))),
+        ))
     }
 
     pub fn unsubscribe(&self, id: u32) {
@@ -130,8 +143,14 @@ impl FixtureStore {
         }
     }
 
-    fn register(&self, subscription: Subscription) -> u32 {
-        let id = self.next_subscription.get() + 1;
+    fn next_id(&self) -> Result<u32, JsValue> {
+        self.next_subscription
+            .get()
+            .checked_add(1)
+            .ok_or_else(|| JsValue::from_str("subscription limit reached"))
+    }
+
+    fn register(&self, id: u32, subscription: Subscription) -> u32 {
         self.next_subscription.set(id);
         self.subscriptions.borrow_mut().insert(id, subscription);
         id

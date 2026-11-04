@@ -6,10 +6,10 @@ use rstate::{Store, StoreConfig, StoreError};
 #[error("application operation failed")]
 struct ApplicationFailure(#[source] io::Error);
 
-fn assert_shareable_error<T: Error + Send + Sync + 'static>() {}
+const fn assert_shareable_error<T: Error + Send + Sync + 'static>() {}
 
 fn propagate_store_failure() -> Result<(), Box<dyn Error + Send + Sync>> {
-    let store: Store<Rc<()>, ()> = Store::new(StoreConfig::new(Rc::new(()), |_, _, _| {
+    let store: Store<Rc<()>, ()> = Store::new(StoreConfig::new(Rc::new(()), |_, (), _| {
         Err(StoreError::from_error(io::Error::other(
             "application failure",
         )))

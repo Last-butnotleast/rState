@@ -24,7 +24,7 @@ impl<C: fmt::Debug, E, M> fmt::Debug for Store<C, E, M> {
     }
 }
 
-pub(crate) struct StoreInner<C, E, M> {
+pub struct StoreInner<C, E, M> {
     pub(crate) initial: Rc<Snapshot<C>>,
     pub(crate) current: RefCell<Rc<Snapshot<C>>>,
     pub(crate) reducer: Rc<Reducer<C, E, M>>,

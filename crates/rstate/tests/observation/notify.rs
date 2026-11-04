@@ -80,14 +80,17 @@ fn cross_store_nested_send_drains_the_shared_queue_before_returning() {
 fn subscriber_errors_drain_later_observers_keep_committed_state_and_skip_effects() {
     let trace = Rc::new(RefCell::new(Vec::new()));
     let effect_trace = Rc::clone(&trace);
-    let store = Store::<i32, ()>::new(StoreConfig::new(0, move |context: &Rc<i32>, _, enqueue| {
-        let trace = Rc::clone(&effect_trace);
-        enqueue.effect(move |_| {
-            trace.borrow_mut().push("effect");
-            Ok(())
-        });
-        Ok(Update::replace(**context + 1))
-    }));
+    let store = Store::<i32, ()>::new(StoreConfig::new(
+        0,
+        move |context: &Rc<i32>, (), enqueue| {
+            let trace = Rc::clone(&effect_trace);
+            enqueue.effect(move |_| {
+                trace.borrow_mut().push("effect");
+                Ok(())
+            });
+            Ok(Update::replace(**context + 1))
+        },
+    ));
     let first_trace = Rc::clone(&trace);
     let first = store.subscribe(move |_| {
         first_trace.borrow_mut().push("bad");

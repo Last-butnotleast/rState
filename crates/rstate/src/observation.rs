@@ -6,5 +6,5 @@ mod subscription;
 pub use selection::Selection;
 pub use subscription::Subscription;
 
-pub(crate) use emission::Emissions;
-pub(crate) use notify::{ObserverSlot, Observers};
+pub use emission::Emissions;
+pub use notify::{ObserverSlot, Observers};

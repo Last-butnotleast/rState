@@ -15,7 +15,7 @@ struct Entry<M> {
     listener: Box<Listener<M>>,
 }
 
-pub(crate) struct Emissions<M> {
+pub struct Emissions<M> {
     inner: Rc<EmissionEntries<M>>,
 }
 
@@ -38,7 +38,14 @@ impl<M> Default for Emissions<M> {
 impl<M: 'static> Emissions<M> {
     fn register(&self, entry: Entry<M>) -> Subscription {
         let id = self.inner.next_id.get();
-        self.inner.next_id.set(id.checked_add(1).unwrap());
+        #[expect(
+            clippy::expect_used,
+            reason = "exhausting monotonic subscription IDs cannot preserve registration order"
+        )]
+        self.inner.next_id.set(
+            id.checked_add(1)
+                .expect("emission subscription IDs exhausted"),
+        );
         self.inner.entries.borrow_mut().insert(id, Rc::new(entry));
         let weak = Rc::downgrade(&self.inner);
         Subscription::new(move || {
@@ -70,12 +77,12 @@ impl<M: 'static> Emissions<M> {
         })
     }
 
-    pub(crate) fn emit(&self, message: Rc<M>) -> StoreResult<()> {
-        self.emit_tier(message.clone(), false)?;
+    pub(crate) fn emit(&self, message: &Rc<M>) -> StoreResult<()> {
+        self.emit_tier(message, false)?;
         self.emit_tier(message, true)
     }
 
-    fn emit_tier(&self, message: Rc<M>, wildcard: bool) -> StoreResult<()> {
+    fn emit_tier(&self, message: &Rc<M>, wildcard: bool) -> StoreResult<()> {
         let mut cursor = None;
         loop {
             let next = {
@@ -90,7 +97,7 @@ impl<M: 'static> Emissions<M> {
                 return Ok(());
             };
             cursor = Some(id);
-            if entry.filter.as_ref().is_none_or(|filter| filter(&message)) {
+            if entry.filter.as_ref().is_none_or(|filter| filter(message)) {
                 (entry.listener)(message.clone())?;
             }
         }

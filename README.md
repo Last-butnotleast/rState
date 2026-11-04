@@ -111,10 +111,15 @@ Each creation allocates fresh context and snapshot handles with independent subs
 Use the installed stable Rust toolchain with the WASM target. The initial implementation was checked with Rust 1.98.0. The manifest uses Rust edition 2024 and declares Rust 1.85 as its language baseline; the minimum compiler has not been separately tested.
 
 ```sh
-cargo test -p rstate
+cargo test --locked --workspace --all-features
 cargo fmt --all -- --check
-cargo clippy --workspace --all-targets -- -D warnings
+cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+cargo clippy --locked -p rstate-wasm --target wasm32-unknown-unknown --all-features -- -D warnings
 ```
+
+Unsafe code is forbidden. Clippy's `all`, `pedantic` and `nursery` groups are denied, together with explicit restrictions on unwraps, expects, panics, indexing, unchecked arithmetic, casts and unfinished code. The upstream allowances for repeated module names, suggested `must_use` attributes and error/panic documentation are retained; usage and rationale live in Markdown.
+
+The root `clippy.toml` also follows upstream: unwraps, expects, indexing and panics are permitted inside tests. Production code retains those restrictions. Any additional exception must name the individual lint, stay narrowly scoped and include a reason. GitHub Actions runs the formatting, native and WASM lint checks and native tests above on pull requests and pushes to `main`.
 
 See the test app's README for browser setup, building the WASM adapter and running parity tests.
 

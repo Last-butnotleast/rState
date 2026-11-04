@@ -42,6 +42,14 @@ fn input(count: i32, label: &str) -> Input {
     }
 }
 
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "the reusable reducer matches the fallible store callback contract"
+)]
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "the fixture uses bounded counter inputs"
+)]
 fn reduce(
     context: &Rc<Context>,
     event: &Event,
@@ -64,6 +72,10 @@ fn reduce(
     }
 }
 
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "the fixture counts a bounded number of store initializations"
+)]
 fn factory(calls: Rc<Cell<usize>>) -> StoreFactory<Input, Context, Event, Message> {
     StoreFactory::new(
         move |input: Input| {
@@ -98,6 +110,10 @@ fn cloned_factories_initialize_each_consumed_non_clone_input() {
 }
 
 #[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "the scenario verifies independent instances across all observation channels"
+)]
 fn equal_inputs_create_independent_state_observers_emissions_and_selection_caches() {
     let factory = factory(Rc::new(Cell::new(0)));
     let left = factory.create(input(5, "same")).unwrap();
@@ -296,7 +312,7 @@ fn created_stores_keep_the_shared_reducer_alive_after_factory_handles_are_droppe
 fn unit_inputs_create_ordinary_stores_with_pure_transition_and_availability() {
     let factory: StoreFactory<(), i32, ()> = StoreFactory::new(
         |()| Ok(1),
-        |context: &Rc<i32>, _: &(), _| Ok(Update::replace(**context + 1)),
+        |context: &Rc<i32>, (): &(), _| Ok(Update::replace(**context + 1)),
     );
     let store = factory.create(()).unwrap();
     let initial = store.get_snapshot();
@@ -331,11 +347,13 @@ fn factory_debug_accepts_opaque_types_without_executing_callbacks() {
     );
 
     assert!(format!("{factory:?}").contains("StoreFactory"));
-    assert!(format!("{:#?}", factory.clone()).contains("StoreFactory"));
+    let cloned = factory.clone();
+    drop(factory);
+    assert!(format!("{cloned:#?}").contains("StoreFactory"));
     assert_eq!(initialized.get(), 0);
     assert_eq!(reduced.get(), 0);
 
-    let store = factory.create(input(2, "opaque")).unwrap();
+    let store = cloned.create(input(2, "opaque")).unwrap();
     assert!(!store.can(Event::Keep).unwrap());
     assert_eq!(initialized.get(), 1);
     assert_eq!(reduced.get(), 1);
@@ -346,7 +364,7 @@ fn borrowed_inputs_can_be_converted_to_owned_contexts() {
     let label = String::from("borrowed input");
     let factory: StoreFactory<&str, String, ()> = StoreFactory::new(
         |input: &str| Ok(input.to_owned()),
-        |_, _: &(), _| Ok(Update::Keep),
+        |_, (): &(), _| Ok(Update::Keep),
     );
     let store = factory.clone().create(label.as_str()).unwrap();
     drop(factory);

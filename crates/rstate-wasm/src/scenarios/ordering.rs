@@ -22,14 +22,20 @@ pub fn reduce(
                 recorder(json!({"kind": "effect", "label": "after", "count": scope.get_snapshot().context.count}))
             });
             Ok(Update::replace(Context {
-                count: context.count + 1,
+                count: context
+                    .count
+                    .checked_add(1)
+                    .ok_or_else(|| StoreError::new("count overflow"))?,
                 ..context.as_ref().clone()
             }))
         }
         Event::EffectFail => {
             enqueue.effect(|_| Err(StoreError::new("effect failed")));
             Ok(Update::replace(Context {
-                count: context.count + 1,
+                count: context
+                    .count
+                    .checked_add(1)
+                    .ok_or_else(|| StoreError::new("count overflow"))?,
                 ..context.as_ref().clone()
             }))
         }

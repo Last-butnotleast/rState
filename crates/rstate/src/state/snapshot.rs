@@ -6,7 +6,7 @@ pub struct Snapshot<C> {
 }
 
 impl<C> Snapshot<C> {
-    pub fn new(context: Rc<C>) -> Self {
+    pub const fn new(context: Rc<C>) -> Self {
         Self { context }
     }
 }

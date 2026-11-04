@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use rstate::{Store, StoreConfig, StoreError, Update};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Context {
     pub count: i32,
     pub label: String,
@@ -16,6 +16,10 @@ pub enum Event {
     Fail,
 }
 
+#[expect(
+    clippy::arithmetic_side_effects,
+    reason = "the fixture uses bounded counter inputs"
+)]
 pub fn counter() -> Store<Context, Event> {
     Store::new(StoreConfig::new(
         Context {

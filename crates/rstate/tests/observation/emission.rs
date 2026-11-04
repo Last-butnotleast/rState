@@ -9,7 +9,7 @@ enum Message {
 
 #[test]
 fn filtered_listeners_precede_wildcard_listeners_and_can_unsubscribe() {
-    let store = Store::new(StoreConfig::new((), |_, _: &(), enqueue| {
+    let store = Store::new(StoreConfig::new((), |_, (): &(), enqueue| {
         enqueue.emit(Message::Receipt(7));
         enqueue.emit(Message::Notice);
         Ok(Update::Keep)
@@ -53,7 +53,7 @@ fn emitted_listener_errors_stop_remaining_listeners_and_effects_after_commit() {
     let later_trace = Rc::clone(&trace);
     let store = Store::new(StoreConfig::new(
         0,
-        move |context: &Rc<i32>, _: &(), enqueue| {
+        move |context: &Rc<i32>, (): &(), enqueue| {
             enqueue.emit(Message::Receipt(7));
             let trace = Rc::clone(&later_trace);
             enqueue.effect(move |_| {

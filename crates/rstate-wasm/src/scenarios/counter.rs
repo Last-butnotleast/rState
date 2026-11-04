@@ -7,7 +7,10 @@ use super::{Context, Event, Message, Queue};
 pub fn reduce(context: &Rc<Context>, event: &Event) -> StoreResult<Update<Context>> {
     match event {
         Event::Inc { by } | Event::Bump { by } => Ok(Update::replace(Context {
-            count: context.count + by,
+            count: context
+                .count
+                .checked_add(*by)
+                .ok_or_else(|| StoreError::new("count overflow"))?,
             ..context.as_ref().clone()
         })),
         Event::Same => Ok(Update::Replace(context.clone())),
@@ -32,7 +35,11 @@ pub fn composition(
         Event::Recalculate => {
             enqueue.trigger(Event::Receipt);
             Ok(Update::replace(Context {
-                total: context.items.iter().sum(),
+                total: context.items.iter().try_fold(0_i64, |total, price| {
+                    total
+                        .checked_add(*price)
+                        .ok_or_else(|| StoreError::new("total overflow"))
+                })?,
                 ..context.as_ref().clone()
             }))
         }

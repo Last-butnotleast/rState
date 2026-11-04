@@ -30,7 +30,7 @@ impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
         let scope = EffectScope::new(self.clone(), result.snapshot);
         for effect in result.effects {
             match effect {
-                Effect::Emit(message) => self.inner.emissions.emit(message)?,
+                Effect::Emit(message) => self.inner.emissions.emit(&message)?,
                 Effect::Run(effect) => effect(scope.clone())?,
             }
         }
