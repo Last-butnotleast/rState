@@ -79,5 +79,8 @@ pub(super) fn describe(inspection: &Inspection<'_, Context, Event>) -> String {
             };
             format!("inspect:{name}:{}", snapshot.context.count)
         }
+        Inspection::Control { action, snapshot } => {
+            format!("inspect:{action:?}:{}", snapshot.context.count)
+        }
     }
 }

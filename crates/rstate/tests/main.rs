@@ -2,6 +2,7 @@ mod effects;
 mod error;
 mod inspection;
 mod observation;
+mod persistence;
 mod state;
 mod store;
 mod support;

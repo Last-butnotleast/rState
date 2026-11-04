@@ -1,0 +1,39 @@
+{
+  "name": "Reset and bounded snapshot history",
+  "configuration": {
+    "scenario": "composition",
+    "initialCount": 5,
+    "historyLimit": 3
+  },
+  "steps": [
+    { "op": "initial" },
+    { "op": "subscribe", "listener": "state" },
+    { "op": "inspect", "listener": "events" },
+    { "op": "subscribeSelected", "listener": "count", "field": "count" },
+    { "op": "undo" },
+    { "op": "send", "event": { "type": "inc", "by": 2 } },
+    { "op": "send", "event": { "type": "keep" } },
+    { "op": "send", "event": { "type": "add", "price": 8 } },
+    { "op": "history" },
+    { "op": "undo" },
+    { "op": "snapshot" },
+    { "op": "undo" },
+    { "op": "snapshot" },
+    { "op": "redo" },
+    { "op": "redo" },
+    { "op": "redo" },
+    { "op": "reset" },
+    { "op": "history" },
+    { "op": "undo" },
+    { "op": "redo" },
+    { "op": "resetWithCount", "count": 11 },
+    { "op": "undo" },
+    { "op": "send", "event": { "type": "inc", "by": 1 } },
+    { "op": "redo" },
+    { "op": "send", "event": { "type": "fail" } },
+    { "op": "history" },
+    { "op": "reset" },
+    { "op": "reset" },
+    { "op": "snapshot" }
+  ]
+}

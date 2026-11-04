@@ -1,5 +1,10 @@
-use std::{cell::RefCell, fmt, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    fmt,
+    rc::Rc,
+};
 
+use crate::persistence::PersistenceState;
 use crate::{Snapshot, StoreConfig, StoreResult, Subscription};
 use crate::{
     observation::Emissions, observation::Inspectors, observation::Observers, transition::Reducer,
@@ -27,12 +32,16 @@ impl<C: fmt::Debug, E, M> fmt::Debug for Store<C, E, M> {
 }
 
 pub struct StoreInner<C, E, M> {
+    pub(crate) defaults: Rc<C>,
     pub(crate) initial: Rc<Snapshot<C>>,
     pub(crate) current: RefCell<Rc<Snapshot<C>>>,
     pub(crate) reducer: Rc<Reducer<C, E, M>>,
     pub(crate) observers: Observers,
     pub(crate) inspectors: Inspectors<C, E>,
     pub(crate) emissions: Emissions<M>,
+    pub(crate) history_limit: Option<usize>,
+    pub(crate) revision: Rc<Cell<u64>>,
+    pub(crate) persistence: Option<Rc<PersistenceState<C>>>,
 }
 
 impl<C, E, M> Clone for Store<C, E, M> {
@@ -45,15 +54,31 @@ impl<C, E, M> Clone for Store<C, E, M> {
 
 impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
     pub fn new(config: StoreConfig<C, E, M>) -> Self {
-        let snapshot = Rc::new(Snapshot::new(config.initial));
+        let initial = config.initial.clone();
+        Self::from_parts(config, initial, None)
+    }
+
+    pub(crate) fn from_parts(
+        config: StoreConfig<C, E, M>,
+        initial: Rc<C>,
+        persistence: Option<Rc<PersistenceState<C>>>,
+    ) -> Self {
+        let snapshot = Rc::new(Snapshot::initial(initial, config.history_limit));
+        let revision = persistence
+            .as_ref()
+            .map_or_else(|| Rc::new(Cell::new(0)), |state| state.revision());
         Self {
             inner: Rc::new(StoreInner {
+                defaults: config.initial,
                 initial: snapshot.clone(),
                 current: RefCell::new(snapshot),
                 reducer: config.reducer,
                 observers: Observers::default(),
                 inspectors: Inspectors::default(),
                 emissions: Emissions::default(),
+                history_limit: config.history_limit,
+                revision,
+                persistence,
             }),
         }
     }

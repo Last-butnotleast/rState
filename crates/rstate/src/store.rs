@@ -1,7 +1,10 @@
+mod commit;
+mod control;
 mod dispatch;
 mod factory;
 mod handle;
 mod inspection;
+mod persistence;
 mod selection;
 mod weak;
 

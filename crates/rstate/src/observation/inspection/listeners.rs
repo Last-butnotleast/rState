@@ -5,7 +5,7 @@ use std::{
     rc::Rc,
 };
 
-use crate::{Snapshot, StoreResult, Subscription};
+use crate::{ControlAction, Snapshot, StoreResult, Subscription};
 
 use super::Inspection;
 
@@ -64,6 +64,24 @@ impl<C: 'static, E: 'static> Inspectors<C, E> {
     }
 
     pub(crate) fn notify(&self, event: &E, snapshot: &Rc<Snapshot<C>>) -> StoreResult<()> {
+        self.notify_with(|| Inspection::Transition {
+            event,
+            snapshot: snapshot.clone(),
+        })
+    }
+
+    pub(crate) fn control(
+        &self,
+        action: ControlAction,
+        snapshot: &Rc<Snapshot<C>>,
+    ) -> StoreResult<()> {
+        self.notify_with(|| Inspection::Control {
+            action,
+            snapshot: snapshot.clone(),
+        })
+    }
+
+    fn notify_with<'a>(&self, inspection: impl Fn() -> Inspection<'a, C, E>) -> StoreResult<()> {
         let mut cursor = None;
         loop {
             let next = {
@@ -78,10 +96,7 @@ impl<C: 'static, E: 'static> Inspectors<C, E> {
                 return Ok(());
             };
             cursor = Some(id);
-            listener(Inspection::Transition {
-                event,
-                snapshot: snapshot.clone(),
-            })?;
+            listener(inspection())?;
         }
     }
 }

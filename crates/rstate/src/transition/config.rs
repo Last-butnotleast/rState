@@ -7,6 +7,7 @@ pub type Reducer<C, E, M> = dyn Fn(&Rc<C>, &E, &mut Enqueue<C, E, M>) -> StoreRe
 pub struct StoreConfig<C, E, M = ()> {
     pub(crate) initial: Rc<C>,
     pub(crate) reducer: Rc<Reducer<C, E, M>>,
+    pub(crate) history_limit: Option<usize>,
 }
 
 impl<C: fmt::Debug, E, M> fmt::Debug for StoreConfig<C, E, M> {
@@ -25,6 +26,13 @@ impl<C, E, M> StoreConfig<C, E, M> {
         Self {
             initial: Rc::new(initial),
             reducer: Rc::new(reducer),
+            history_limit: None,
         }
+    }
+
+    #[must_use]
+    pub const fn with_history(mut self, limit: usize) -> Self {
+        self.history_limit = Some(limit);
+        self
     }
 }

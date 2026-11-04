@@ -33,6 +33,18 @@ impl Identities {
             self.contexts.push(snapshot.context.clone());
             self.contexts.len()
         };
-        json!({"context": snapshot.context.as_ref(), "snapshotId": snapshot_id, "contextId": context_id})
+        let mut value = json!({"context": snapshot.context.as_ref(), "snapshotId": snapshot_id, "contextId": context_id});
+        let history = snapshot.history_status();
+        if let (Value::Object(object), Some(limit)) = (&mut value, history.limit) {
+            object.insert(
+                "history".to_owned(),
+                json!({
+                    "past": history.past,
+                    "future": history.future,
+                    "limit": limit,
+                }),
+            );
+        }
+        value
     }
 }

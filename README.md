@@ -1,6 +1,6 @@
 # rstate
 
-A small synchronous Rust state store with typed events, shared snapshots, pure transitions, subscriptions, effects, emitted events, transition inspection, context selections and reusable factories. The library uses the Rust standard library and `thiserror`; JavaScript, serialization and browser dependencies stay in the separate test adapter.
+A small synchronous Rust state store with typed events, shared snapshots, pure transitions, subscriptions, effects, emitted events, transition inspection, context selections, reusable factories, reset, snapshot history and synchronous snapshot persistence. The default library uses the Rust standard library and `thiserror`; the optional `json` feature adds a serialization adapter.
 
 The selected behavior follows [`@xstate/store` 4.3.0 at commit `9b3a88f`](https://github.com/statelyai/xstate/tree/9b3a88fa43f4be5433797acfba18f27c40494bd2/packages/xstate-store). This is a core implementation, not a port of the complete package or its extensions.
 
@@ -140,6 +140,9 @@ let inspection = store.inspect(|record| {
         Inspection::Transition { snapshot, .. } => {
             println!("transition count: {}", snapshot.context.count);
         }
+        Inspection::Control { action, snapshot } => {
+            println!("{action:?} count: {}", snapshot.context.count);
+        }
     }
     Ok(())
 }).unwrap();
@@ -153,9 +156,47 @@ State is committed before ordinary and selected subscribers run, followed by ins
 
 Inspector iteration follows live registration order: removing a listener before its turn skips it, while adding a listener during notification gives it an immediate initial record and then the current transition record. Registration precedes the immediate callback. If that callback fails, `inspect` returns its error while the registration remains active and no unsubscribe handle is returned, matching the reference behavior.
 
+## Reset and snapshot history
+
+`store.reset()` restores the defaults captured when that instance was configured. It creates a fresh snapshot even when the context already equals those defaults, notifies subscribers, and reports `Inspection::Control` with `ControlAction::Reset`. It does not invoke the reducer or execute effects. `reset_with` takes a fallible function receiving the shared default and current context handles and returning the replacement handle; failure leaves live state unchanged.
+
+Enable bounded snapshot history with `StoreConfig::with_history(limit)` or `StoreFactory::with_history(limit)`:
+
+```rust
+let history: Store<i32, i32> = Store::new(
+    StoreConfig::new(0, |count, by, _| {
+        Ok(Update::replace(count.saturating_add(*by)))
+    }).with_history(100),
+);
+history.send(3).unwrap();
+assert!(history.can_undo());
+history.undo().unwrap();
+assert_eq!(*history.get_snapshot().context, 0);
+history.redo().unwrap();
+history.reset().unwrap();
+history.undo().unwrap();
+assert_eq!(*history.get_snapshot().context, 3);
+```
+
+Every successfully evaluated outer domain event records its pre-state, including no-ops. An internal FIFO macrostep records one entry. New domain events and resets clear redo history. Zero capacity is valid and retains no entries. Undo and redo restore shared context handles without replaying reducers, effects or emissions; snapshot history assumes immutable context replacement and cannot reverse arbitrary interior mutation.
+
+`store.history_status()` and `snapshot.history_status()` expose `HistoryStatus { past, future, limit }`; `None` means history is disabled. History-only changes publish fresh snapshots, so ordinary subscribers can observe availability even when the context handle stays equal. Context selections continue suppressing equal projections. Empty undo/redo operations preserve snapshot identity but still report their typed control action. Domain `can` and pure `transition` queries simulate returned history without mutating live history or storage, and domain availability keeps the original reducer's meaning.
+
+State and history commit together before notifications, followed by inspection, persistence and user effects. Subscriber or inspector errors retain committed history and stop later pipeline stages. Reentrant commits retain each dispatch's inspection snapshot. Reset is undoable when history is enabled.
+
+## Synchronous snapshot persistence
+
+`Persistence::new(name, version, storage, codec)` supplies a synchronous `SnapshotStorage` byte adapter and `SnapshotCodec<Context>`. `Store::new_persisted(config, persistence)` and `factory.create_persisted(input, persistence)` load before exposing the store. Missing data uses configured defaults; storage, decoding and version failures return typed errors without overwriting saved data. Enable the optional `json` feature for `JsonCodec`; other codecs add no global serialization bounds.
+
+The loaded context becomes the visible initial snapshot and empty-history starting point. Configured factory defaults remain the reset target, so resetting a hydrated store restores defaults and undoing that reset can recover the loaded context. Only context is persisted; history stacks and subscriptions are not serialized.
+
+Committed domain events and controls automatically save after successful subscriber/inspection delivery and before user effects. Revision and clear-epoch checks prevent stale outer frames from overwriting newer nested commits or recreating storage after a nested clear. Nested domain sends during codec or storage callbacks are serialized into the latest pending write. Persistence bookkeeping is outside snapshots: attaching persistence alone does not manufacture identity changes for otherwise unchanged domain or empty control operations.
+
+Automatic-save failures leave committed state intact, report through `Persistence::on_error` and `store.persistence_error()`, and do not turn the domain action into a storage error. `store.save()` explicitly retries the current context; `store.clear_storage()` removes saved data without resetting live state or history. Explicit operations return typed errors, including a busy error if called reentrantly from active storage I/O. A successful write clears the last reported persistence error. `save()` propagates a queued write failure and returns `PersistenceError::Superseded` if reentrant changes leave the current revision unpersisted.
+
 ## Layout
 
-`crates/rstate/src` composes focused files under five domains: state, transition, effects, observation and store. Native behavior tests live in the separate mirrored `crates/rstate/tests` tree and use a single explicit Cargo integration-test target. No handwritten code comments or inline test modules are used.
+`crates/rstate/src` composes focused state, transition, effects, observation, store, control, history and persistence domains. Native behavior tests live in the separate mirrored `crates/rstate/tests` tree and use a single explicit Cargo integration-test target. No handwritten code comments or inline test modules are used.
 
 `crates/rstate-wasm` is an unpublished browser test adapter. `test-app` runs real Rust/WASM and the pinned JavaScript reference over matching scenarios. It is development tooling, not a general JavaScript SDK.
 
@@ -180,4 +221,4 @@ See the test app's README for browser setup, building the WASM adapter and runni
 
 ## Current boundary
 
-The core is intentionally single-threaded and synchronous. Selection composition uses explicit one- or two-source dependencies; automatic dependency discovery and general atom APIs remain outside the implementation scope. Async/source atoms, managed async effects, persistence, reset/undo, validation and XState actor integration are also outside scope. Transition inspection emits callbacks only; it does not retain history or implement the XState actor inspection protocol.
+The core is intentionally single-threaded and synchronous. Selection composition uses explicit one- or two-source dependencies; automatic dependency discovery and general atom APIs remain outside the implementation scope. Async/source atoms, managed async effects, runtime validation and XState actor integration remain outside scope. History uses bounded snapshots; event replay, grouping, filters and custom restore effects are deferred. Persistence saves full context synchronously; async storage, event logs, partial merges, migrations, throttling and broadcast are deferred. Transition inspection emits callbacks only and does not implement the XState actor inspection protocol.

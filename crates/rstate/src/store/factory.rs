@@ -7,6 +7,7 @@ type Initializer<I, C> = dyn Fn(I) -> StoreResult<C>;
 pub struct StoreFactory<I, C, E, M = ()> {
     initializer: Rc<Initializer<I, C>>,
     reducer: Rc<Reducer<C, E, M>>,
+    history_limit: Option<usize>,
 }
 
 impl<I, C, E, M> Clone for StoreFactory<I, C, E, M> {
@@ -14,6 +15,7 @@ impl<I, C, E, M> Clone for StoreFactory<I, C, E, M> {
         Self {
             initializer: self.initializer.clone(),
             reducer: self.reducer.clone(),
+            history_limit: self.history_limit,
         }
     }
 }
@@ -32,16 +34,28 @@ impl<I, C, E, M> StoreFactory<I, C, E, M> {
         Self {
             initializer: Rc::new(initializer),
             reducer: Rc::new(reducer),
+            history_limit: None,
         }
+    }
+
+    #[must_use]
+    pub const fn with_history(mut self, limit: usize) -> Self {
+        self.history_limit = Some(limit);
+        self
     }
 }
 
 impl<I, C: 'static, E: 'static, M: 'static> StoreFactory<I, C, E, M> {
     pub fn create(&self, input: I) -> StoreResult<Store<C, E, M>> {
+        self.config(input).map(Store::new)
+    }
+
+    pub(crate) fn config(&self, input: I) -> StoreResult<StoreConfig<C, E, M>> {
         let initial = Rc::new((self.initializer)(input)?);
-        Ok(Store::new(StoreConfig {
+        Ok(StoreConfig {
             initial,
             reducer: self.reducer.clone(),
-        }))
+            history_limit: self.history_limit,
+        })
     }
 }

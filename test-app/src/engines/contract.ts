@@ -5,6 +5,7 @@ export type Snapshot = {
   context: Context;
   snapshotId: number;
   contextId: number;
+  history?: { past: number; future: number; limit: number | null };
 };
 export type Message = { type: string; total?: number };
 export type TraceEntry = Record<string, unknown>;

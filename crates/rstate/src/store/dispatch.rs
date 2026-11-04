@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
-use crate::{Effect, EffectScope, Snapshot, StoreResult, TransitionResult, transition::reduce};
+use crate::{Snapshot, StoreResult, TransitionResult, transition::reduce};
 
-use super::Store;
+use super::{Store, commit::Action};
 
 impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
     pub fn transition(
@@ -10,7 +10,8 @@ impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
         snapshot: Rc<Snapshot<C>>,
         event: E,
     ) -> StoreResult<TransitionResult<C, E, M>> {
-        let result = reduce(self.inner.reducer.as_ref(), snapshot, &event);
+        let result = self.evaluate(&snapshot, &event);
+        drop(snapshot);
         drop(event);
         result
     }
@@ -22,24 +23,22 @@ impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
 
     pub fn send(&self, event: E) -> StoreResult<()> {
         let previous = self.get_snapshot();
-        let result = reduce(self.inner.reducer.as_ref(), previous.clone(), &event)?;
-        self.inner.current.replace(result.snapshot.clone());
-
-        if !Rc::ptr_eq(&previous, &result.snapshot) {
-            self.inner.observers.publish()?;
-        }
-
-        self.inner.inspectors.notify(&event, &result.snapshot)?;
-
-        let scope = EffectScope::new(self.clone(), result.snapshot);
-        for effect in result.effects {
-            match effect {
-                Effect::Emit(message) => self.inner.emissions.emit(&message)?,
-                Effect::Run(effect) => effect(scope.clone())?,
-            }
-        }
-        scope.complete();
+        let result = self.evaluate(&previous, &event)?;
+        self.commit(result.snapshot, &Action::Event(&event), result.effects)?;
         drop(event);
         Ok(())
+    }
+
+    fn evaluate(
+        &self,
+        snapshot: &Rc<Snapshot<C>>,
+        event: &E,
+    ) -> StoreResult<TransitionResult<C, E, M>> {
+        let mut result = reduce(self.inner.reducer.as_ref(), snapshot.clone(), event)?;
+        if self.inner.history_limit.is_some() {
+            result.snapshot =
+                Rc::new(snapshot.record(result.snapshot.context.clone(), self.inner.history_limit));
+        }
+        Ok(result)
     }
 }

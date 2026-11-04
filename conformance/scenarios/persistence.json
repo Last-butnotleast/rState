@@ -1,0 +1,29 @@
+{
+  "name": "Hydrated snapshots with reset and history",
+  "configuration": {
+    "scenario": "composition",
+    "initialCount": 5,
+    "historyLimit": 3,
+    "persistence": { "name": "state", "version": 1 }
+  },
+  "stored": {
+    "context": { "count": 20, "items": [], "total": 0 },
+    "version": 1
+  },
+  "steps": [
+    { "op": "initial" },
+    { "op": "subscribe", "listener": "state" },
+    { "op": "inspect", "listener": "events" },
+    { "op": "send", "event": { "type": "inc", "by": 2 } },
+    { "op": "send", "event": { "type": "add", "price": 8 } },
+    { "op": "undo" },
+    { "op": "redo" },
+    { "op": "reset" },
+    { "op": "undo" },
+    { "op": "clearStorage" },
+    { "op": "snapshot" },
+    { "op": "history" },
+    { "op": "send", "event": { "type": "inc", "by": 1 } },
+    { "op": "persistenceError" }
+  ]
+}

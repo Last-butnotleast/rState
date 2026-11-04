@@ -38,6 +38,21 @@
       "source": "LICENSE",
       "target": "LICENSE",
       "sha256": "542d926d7bbb099785e322d1d5574c539d51942e52ec8adce2be4629ba81fc7f"
+    },
+    {
+      "source": "packages/xstate-store/src/reset.ts",
+      "target": "src/reset.ts",
+      "sha256": "439367d9f32d4205cc2b7b108f09fdfb85417cb2c655a90ac164b64fce29d3a0"
+    },
+    {
+      "source": "packages/xstate-store/src/undo.ts",
+      "target": "src/undo.ts",
+      "sha256": "1799a1f425db7701b279167252a49a121cfcea50d862873817e95db2e0cc5886"
+    },
+    {
+      "source": "packages/xstate-store/src/persist.ts",
+      "target": "src/persist.ts",
+      "sha256": "879935a50eb242c9e2128e8bb89c8a7193fd712bf8d14e42f353d58ae84a2ca2"
     }
   ]
 }

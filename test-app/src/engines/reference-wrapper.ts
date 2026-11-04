@@ -1,13 +1,20 @@
 import type { SourceStore } from "@reference/store";
 import type { Context, Engine, Snapshot } from "./contract";
 
-export function wrapReference(store: SourceStore): Engine {
+export function wrapReference(
+  store: SourceStore,
+  historyLimit?: number,
+): Engine {
   const subscriptions: (() => void)[] = [];
   const snapshots = new WeakMap<object, number>();
   const contexts = new WeakMap<object, number>();
   let nextSnapshot = 0;
   let nextContext = 0;
-  const snapshot = (value: { context: Context }): Snapshot => {
+  const snapshot = (value: {
+    context: Context;
+    past?: unknown[];
+    future?: unknown[];
+  }): Snapshot => {
     if (!snapshots.has(value)) snapshots.set(value, ++nextSnapshot);
     if (!contexts.has(value.context))
       contexts.set(value.context, ++nextContext);
@@ -15,6 +22,15 @@ export function wrapReference(store: SourceStore): Engine {
       context: value.context,
       snapshotId: snapshots.get(value)!,
       contextId: contexts.get(value.context)!,
+      ...(historyLimit === undefined
+        ? {}
+        : {
+            history: {
+              past: value.past?.length ?? 0,
+              future: value.future?.length ?? 0,
+              limit: historyLimit,
+            },
+          }),
     };
   };
   const register = (unsubscribe: () => void) => {

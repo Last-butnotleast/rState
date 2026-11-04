@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::Snapshot;
+use crate::{ControlAction, Snapshot};
 
 #[derive(Debug)]
 pub enum Inspection<'a, C, E> {
@@ -9,6 +9,10 @@ pub enum Inspection<'a, C, E> {
     },
     Transition {
         event: &'a E,
+        snapshot: Rc<Snapshot<C>>,
+    },
+    Control {
+        action: ControlAction,
         snapshot: Rc<Snapshot<C>>,
     },
 }
