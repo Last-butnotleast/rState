@@ -1,4 +1,4 @@
 mod scenarios;
 mod store;
 
-pub use store::{FixtureFactory, FixtureSelection, FixtureStore};
+pub use store::{FixtureCombined, FixtureFactory, FixtureSelection, FixtureStore};

@@ -6,7 +6,7 @@ mod subscription;
 
 pub use inspection::{Inspection, Inspectors};
 pub use selection::Selection;
-pub use subscription::Subscription;
+pub use subscription::{ScopedSubscription, Subscription};
 
 pub use emission::Emissions;
 pub use notify::{ObserverSlot, Observers};

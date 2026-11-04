@@ -1,4 +1,4 @@
 mod handle;
-mod value;
+pub(super) mod value;
 
 pub use handle::FixtureSelection;

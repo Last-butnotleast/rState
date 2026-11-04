@@ -2,7 +2,7 @@
 
 Implement a small synchronous Rust state-management library with behavioral compatibility for the selected core of @xstate/store 4.3.0, pinned to commit 9b3a88fa43f4be5433797acfba18f27c40494bd2. The browser test app must exercise the actual Rust library through its separate WASM adapter.
 
-Keep typed events, shared immutable snapshots, pure transitions, availability checks, synchronous dispatch, subscriptions, effects, emissions, transition inspection, own-context selections with explicit one-source mapping and reusable input-initialized store factories. General atoms, tracked cross-store selectors, async runtimes, extensions, persistence, schemas and actor integration are outside the current scope.
+Keep typed events, shared immutable snapshots, pure transitions, availability checks, synchronous dispatch, subscriptions with opt-in scoped cleanup, weak store handles, effects, emissions, transition inspection, selections with explicit one-source mapping and two-source combination, and reusable input-initialized store factories. General atoms, automatic dependency tracking, async runtimes, extensions, persistence, schemas and actor integration are outside the current scope.
 
 # Code organization
 

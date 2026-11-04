@@ -19,13 +19,15 @@ impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
 
         Selection::new(
             move |refresh| {
-                #[expect(
-                    clippy::expect_used,
-                    reason = "Selection retains its source while weak callback captures avoid reference cycles"
-                )]
-                let inner = weak.upgrade().expect("selection source is alive");
-                let snapshot = inner.current.borrow().clone();
                 let previous = cache.borrow().clone();
+                let Some(inner) = weak.upgrade() else {
+                    #[expect(
+                        clippy::expect_used,
+                        reason = "a dependency is materialized before callbacks can outlive its store"
+                    )]
+                    return previous.expect("selection dependency is materialized").1;
+                };
+                let snapshot = inner.current.borrow().clone();
                 if let Some((previous_snapshot, value)) = &previous {
                     if !refresh && Rc::ptr_eq(previous_snapshot, &snapshot) {
                         return value.clone();

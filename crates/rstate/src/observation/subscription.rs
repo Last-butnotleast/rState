@@ -1,5 +1,9 @@
 use std::{cell::Cell, fmt, rc::Rc};
 
+mod scoped;
+
+pub use scoped::ScopedSubscription;
+
 pub struct Subscription {
     inner: Rc<SubscriptionInner>,
 }
@@ -26,6 +30,10 @@ impl Clone for Subscription {
 }
 
 impl Subscription {
+    pub const fn scoped(self) -> ScopedSubscription {
+        ScopedSubscription::new(self)
+    }
+
     pub(crate) fn new(cancel: impl Fn() + 'static) -> Self {
         Self {
             inner: Rc::new(SubscriptionInner {

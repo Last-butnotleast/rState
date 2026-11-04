@@ -1,5 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
+mod scoped;
+
 use crate::support::{Event, counter};
 
 #[test]

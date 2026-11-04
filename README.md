@@ -53,9 +53,18 @@ Effects receive a cloneable `EffectScope` with `send` and `get_snapshot`. Snapsh
 
 Subscriptions do not replay their initial value. Dropping a subscription handle leaves registration active; call `unsubscribe` explicitly. It is idempotent. A subscriber failure preserves committed state, drains remaining scheduled notifications, returns the first failure and skips that dispatch's effects. Emitted listeners and effects fail immediately, retaining committed state. Filtered emitted listeners run before wildcard listeners.
 
+Use `subscription.scoped()` to transfer a registration into a non-cloneable `ScopedSubscription` guard. Dropping the guard unsubscribes automatically; `guard.unsubscribe()` ends it earlier and remains idempotent. An ordinary cloned subscription refers to the same registration, so dropping a scoped guard also deactivates its ordinary aliases. Keep the guard alive for the desired observation lifetime. Store, selection, inspection and emitted-event subscriptions use the same guard.
+
+```rust
+let _guard = store.subscribe(|snapshot| {
+    println!("{}", snapshot.context.count);
+    Ok(())
+}).scoped();
+```
+
 `store.select(selector, comparator)` returns a cached `Selection`. Its selector projects only the supplied context; reads captured from other stores are not tracked. `Selection::get` returns a shared value handle. The explicit comparator decides whether a newly computed value replaces the cached one. Selected subscriptions suppress equal results and support the same explicit cleanup.
 
-Selections compose through one explicit dependency using `selection.map(project, comparator)`. Mapping is lazy, caches by the source value's identity, and retains the previous mapped handle when its comparator reports equality. Chaining does not add automatic dependency tracking or multi-source graphs.
+Selections compose through one explicit dependency using `selection.map(project, comparator)`. Mapping is lazy, caches by the source value's identity, and retains the previous mapped handle when its comparator reports equality. Chaining does not add automatic dependency tracking.
 
 ```rust
 let count = store.select(|context| context.count, |left, right| left == right);
@@ -67,7 +76,25 @@ Plain reads remain current without subscribing. Live mapped listeners share an u
 
 Dependency reads establish notification ordering before subscriptions become active. An unwatched chain recomputes on its next read, while comparator-equal results keep their cached value handles.
 
-Captured strong store or selection handles can form reference cycles in application callbacks. Explicitly unsubscribe when those callbacks are no longer needed.
+Two declared inputs compose through `left.combine(&right, project, comparator)`. The projector receives both selected values by reference and returns a cached result. Inputs can belong to the same store or independent stores; combining already-derived selections reuses their calculations. Equality retains the previous result handle, duplicate inputs share observation, and common-root diamond updates produce one coherent result. This is explicit dependency composition, not automatic tracking. Separate sends to independent stores remain separate transitions; combining does not create a multi-store transaction.
+
+Selection handles keep their input stores alive. Registered callbacks use internal non-owning readers to avoid cycles between independent stores. If all public selection handles and one input store are dropped while another store keeps a combined registration active, the expired input retains its last materialized selected value. Updates from the surviving store continue against that cached value. Dropping all store owners releases the registration graph; this is a Rust-native ownership boundary rather than a JavaScript garbage-collection guarantee.
+
+Captured strong store or selection handles can form reference cycles in application callbacks. `store.downgrade()` returns a cloneable `WeakStore` that does not keep the store alive. Its `upgrade()` returns an ordinary owning store handle while the store remains alive, or `None` after its final owning handle is dropped. Selections and retained effect scopes intentionally remain owning handles. Weak handles add no context, event or emitted-value trait bounds.
+
+```rust
+let weak = store.downgrade();
+let _guard = store.subscribe(move |snapshot| {
+    if snapshot.context.count == 1 {
+        if let Some(store) = weak.upgrade() {
+            store.send(Event::Increment(1))?;
+        }
+    }
+    Ok(())
+}).scoped();
+```
+
+Use weak captures when callbacks should not own their store, and scoped guards or explicit unsubscribe when observation ends. Capturing an owning selection or effect scope can still retain the store.
 
 ## Reusing store behavior
 
@@ -153,4 +180,4 @@ See the test app's README for browser setup, building the WASM adapter and runni
 
 ## Current boundary
 
-The core is intentionally single-threaded and synchronous. General atoms, cross-store reactive dependency graphs, async/source atoms, managed async effects, persistence, reset/undo, validation and XState actor integration are outside the implementation scope. Transition inspection emits callbacks only; it does not retain history or implement the XState actor inspection protocol.
+The core is intentionally single-threaded and synchronous. Selection composition uses explicit one- or two-source dependencies; automatic dependency discovery and general atom APIs remain outside the implementation scope. Async/source atoms, managed async effects, persistence, reset/undo, validation and XState actor integration are also outside scope. Transition inspection emits callbacks only; it does not retain history or implement the XState actor inspection protocol.

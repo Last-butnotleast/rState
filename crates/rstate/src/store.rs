@@ -3,6 +3,8 @@ mod factory;
 mod handle;
 mod inspection;
 mod selection;
+mod weak;
 
 pub use factory::StoreFactory;
 pub use handle::Store;
+pub use weak::WeakStore;

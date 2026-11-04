@@ -143,6 +143,10 @@ impl Observers {
         self.inner.dependencies.get() != 0
     }
 
+    pub(crate) fn is_same(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.inner, &other.inner)
+    }
+
     fn schedule(&self) {
         let nodes: Vec<_> = self.inner.entries.borrow().values().cloned().collect();
         for node in nodes {

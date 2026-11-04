@@ -9,17 +9,18 @@ use crate::{StoreResult, Subscription};
 
 use super::{ObserverSlot, Observers};
 
+mod combine;
 mod map;
 
 type Getter<T> = dyn Fn() -> Rc<T>;
-type Attach = dyn Fn(Subscription) -> Subscription;
+type Attach = dyn Fn(Observers) -> Subscription;
 
 pub struct Selection<T> {
     get: Rc<Getter<T>>,
     observers: Observers,
     attach: Rc<Attach>,
     upstream: Rc<RefCell<Option<Subscription>>>,
-    position: ObserverSlot,
+    positions: Rc<[ObserverSlot]>,
     invalidated: Rc<Cell<bool>>,
     source: Rc<dyn Any>,
 }
@@ -47,7 +48,7 @@ impl<T> Clone for Selection<T> {
             observers: self.observers.clone(),
             attach: self.attach.clone(),
             upstream: self.upstream.clone(),
-            position: self.position.clone(),
+            positions: self.positions.clone(),
             invalidated: self.invalidated.clone(),
             source: self.source.clone(),
         }
@@ -61,19 +62,37 @@ impl<T: 'static> Selection<T> {
         source: Rc<dyn Any>,
         position: ObserverSlot,
     ) -> Self {
+        let connection = position.clone();
+        Self::with_dependencies(
+            get,
+            move |observers| attach(connection.attach(observers)),
+            source,
+            vec![position],
+        )
+    }
+
+    fn with_dependencies(
+        get: impl Fn(bool) -> Rc<T> + 'static,
+        attach: impl Fn(Observers) -> Subscription + 'static,
+        source: Rc<dyn Any>,
+        positions: Vec<ObserverSlot>,
+    ) -> Self {
         let invalidated = Rc::new(Cell::new(false));
         let refresh = invalidated.clone();
-        let dependency = position.clone();
+        let positions: Rc<[ObserverSlot]> = positions.into();
+        let dependencies = positions.clone();
         Self {
             get: Rc::new(move || {
                 let value = get(refresh.replace(false));
-                dependency.reserve();
+                for dependency in dependencies.iter() {
+                    dependency.reserve();
+                }
                 value
             }),
             observers: Observers::default(),
             attach: Rc::new(attach),
             upstream: Rc::new(RefCell::new(None)),
-            position,
+            positions,
             invalidated,
             source,
         }
@@ -102,21 +121,22 @@ impl<T: 'static> Selection<T> {
 
     fn observe(&self, local: Subscription) -> Subscription {
         if self.upstream.borrow().is_none() {
-            let registration = self.position.attach(self.observers.clone());
-            let upstream = (self.attach)(registration);
+            let upstream = (self.attach)(self.observers.clone());
             self.upstream.replace(Some(upstream));
         }
 
         let observers = self.observers.clone();
         let upstream = self.upstream.clone();
         let invalidated = self.invalidated.clone();
-        let position = self.position.clone();
+        let positions = self.positions.clone();
         Subscription::new(move || {
             local.unsubscribe();
             if observers.is_empty() {
                 if !observers.has_dependencies() {
                     invalidated.set(true);
-                    position.clear();
+                    for position in positions.iter() {
+                        position.clear();
+                    }
                 }
                 let source = upstream.borrow_mut().take();
                 if let Some(source) = source {
