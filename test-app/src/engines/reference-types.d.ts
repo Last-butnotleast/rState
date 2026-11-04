@@ -23,10 +23,10 @@ declare module "@reference/store" {
     getInitialSnapshot(): SourceSnapshot;
     transition(snapshot: SourceSnapshot, event: Event): Result;
     subscribe(callback: (snapshot: SourceSnapshot) => void): Subscription;
-    select(
-      selector: (context: Context) => number,
-      compare: (left: number, right: number) => boolean,
-    ): { subscribe(callback: (value: number) => void): Subscription };
+    select<T>(
+      selector: (context: Context) => T,
+      compare: (left: T, right: T) => boolean,
+    ): import("@reference/atom").ReadonlyAtom<T>;
     on(type: string, callback: (message: Message) => void): Subscription;
     can: Record<string, (payload?: Record<string, unknown>) => boolean>;
   };
@@ -38,4 +38,15 @@ declare module "@reference/store" {
     context: (input: { count: number }) => Context;
     on: Record<string, Handler>;
   }): { createStore(input: { count: number }): SourceStore };
+}
+
+declare module "@reference/atom" {
+  export type ReadonlyAtom<T> = {
+    get(): T;
+    subscribe(callback: (value: T) => void): { unsubscribe(): void };
+  };
+  export function createAtom<T>(
+    getter: () => T,
+    options?: { compare(left: T, right: T): boolean },
+  ): ReadonlyAtom<T>;
 }

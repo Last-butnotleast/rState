@@ -6,6 +6,10 @@ use std::{
 
 use crate::{StoreResult, Subscription};
 
+mod slot;
+
+pub use slot::ObserverSlot;
+
 thread_local! {
     static PENDING: RefCell<VecDeque<Rc<Notification>>> = const { RefCell::new(VecDeque::new()) };
 }
@@ -80,13 +84,28 @@ pub(crate) struct Observers {
 #[derive(Default)]
 struct ObserverEntries {
     next_id: Cell<u64>,
+    dependencies: Cell<u64>,
     entries: RefCell<BTreeMap<u64, Node>>,
+}
+
+impl ObserverEntries {
+    fn reserve(&self) -> u64 {
+        let id = self.next_id.get();
+        #[expect(
+            clippy::expect_used,
+            reason = "exhausting monotonic subscription IDs cannot preserve registration order"
+        )]
+        self.next_id.set(
+            id.checked_add(1)
+                .expect("observer subscription IDs exhausted"),
+        );
+        id
+    }
 }
 
 impl Observers {
     fn insert(&self, node: Node) -> Subscription {
-        let id = self.inner.next_id.get();
-        self.inner.next_id.set(id.checked_add(1).unwrap());
+        let id = self.inner.reserve();
         self.inner.entries.borrow_mut().insert(id, node);
         let weak = Rc::downgrade(&self.inner);
 
@@ -112,12 +131,16 @@ impl Observers {
         })))
     }
 
-    pub(crate) fn attach(&self, group: Self) -> Subscription {
-        self.insert(Node::Group(group))
+    pub(crate) fn slot(&self) -> ObserverSlot {
+        ObserverSlot::new(Rc::downgrade(&self.inner))
     }
 
     pub(crate) fn is_empty(&self) -> bool {
         self.inner.entries.borrow().is_empty()
+    }
+
+    pub(crate) fn has_dependencies(&self) -> bool {
+        self.inner.dependencies.get() != 0
     }
 
     fn schedule(&self) {

@@ -18,12 +18,16 @@ impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
         let observers = self.inner.observers.clone();
 
         Selection::new(
-            move || {
+            move |refresh| {
+                #[expect(
+                    clippy::expect_used,
+                    reason = "Selection retains its source while weak callback captures avoid reference cycles"
+                )]
                 let inner = weak.upgrade().expect("selection source is alive");
                 let snapshot = inner.current.borrow().clone();
                 let previous = cache.borrow().clone();
                 if let Some((previous_snapshot, value)) = &previous {
-                    if Rc::ptr_eq(previous_snapshot, &snapshot) {
+                    if !refresh && Rc::ptr_eq(previous_snapshot, &snapshot) {
                         return value.clone();
                     }
                 }
@@ -36,8 +40,9 @@ impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
                 cache.replace(Some((snapshot, value.clone())));
                 value
             },
-            move |group| observers.attach(group),
+            |registration| registration,
             source,
+            observers.slot(),
         )
     }
 }

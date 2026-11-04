@@ -9,6 +9,9 @@ export default defineConfig({
       "@reference/store": fileURLToPath(
         new URL("./.reference/src/store.ts", import.meta.url),
       ),
+      "@reference/atom": fileURLToPath(
+        new URL("./.reference/src/atom.ts", import.meta.url),
+      ),
     },
   },
   server: { host: "127.0.0.1", port: 4173, strictPort: true },

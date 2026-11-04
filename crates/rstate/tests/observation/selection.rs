@@ -1,3 +1,5 @@
+mod map;
+
 use std::{cell::RefCell, rc::Rc};
 
 use rstate::{Store, StoreConfig, Update};

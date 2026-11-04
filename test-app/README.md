@@ -37,8 +37,10 @@ Shared declarative scenarios live in `../conformance/scenarios`. Rust fixture re
 
 The original three fixtures cover a counter, cart composition and nested effect dispatch. `factory.json` adds a separate small two-store scenario with input values and store-tagged operations. Its runner uses one actual Rust `StoreFactory` and one upstream `createStoreLogic` definition, rather than separately constructed seeded stores. The live factory panel lets each input-created counter evolve independently and compares the shared factory trace.
 
+`selection.json` checks an explicit source → bucket → label chain. Rust calls `Selection::map` twice; the oracle uses two actual computed `createAtom` values reading the source selection. The trace compares lazy projector counts, per-selection retained identities, equality suppression, shared listeners, detachment and reactivation. Additional browser checks cover nested sends and callback errors. The selection panel displays the live chain and its calculation counts.
+
 This is a test bridge for these fixtures, rather than a general JavaScript API for arbitrary Rust stores. Recoverable fixture errors use explicit library errors; Rust panics and WebAssembly traps are outside the compatibility contract. General atoms, async runtimes and extensions are outside the core scope.
 
 ## Layout
 
-Application state and operations live in `src/app/session.ts` and `useLab.ts`; the display receives values and callbacks. The factory panel follows the same arrangement under `src/app/factory`. Engine adapters, scenarios and trace comparison have their own domains. Tests live in a separate tree under `tests`. Generated WASM bindings live in `src/generated` and are ignored.
+Application state and operations live in `src/app/session.ts` and `useLab.ts`; the display receives values and callbacks. The factory and selection panels follow the same arrangement under `src/app/factory` and `src/app/selection`. Engine adapters, scenarios and trace comparison have their own domains. Tests live in a separate tree under `tests`. Generated WASM bindings live in `src/generated` and are ignored.

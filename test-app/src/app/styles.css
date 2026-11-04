@@ -390,6 +390,15 @@ h2 {
 .factory-instances .control-panel:last-child {
   border-right: 0;
 }
+.selection-values {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.selection-metric {
+  margin-top: 18px;
+  font-size: 32px;
+  letter-spacing: -0.04em;
+}
 footer {
   display: flex;
   justify-content: space-between;
@@ -429,6 +438,9 @@ footer {
     grid-template-columns: 1fr;
   }
   .factory-instances {
+    grid-template-columns: 1fr;
+  }
+  .selection-values {
     grid-template-columns: 1fr;
   }
   .control-panel {

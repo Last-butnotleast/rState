@@ -55,6 +55,18 @@ Subscriptions do not replay their initial value. Dropping a subscription handle 
 
 `store.select(selector, comparator)` returns a cached `Selection`. Its selector projects only the supplied context; reads captured from other stores are not tracked. `Selection::get` returns a shared value handle. The explicit comparator decides whether a newly computed value replaces the cached one. Selected subscriptions suppress equal results and support the same explicit cleanup.
 
+Selections compose through one explicit dependency using `selection.map(project, comparator)`. Mapping is lazy, caches by the source value's identity, and retains the previous mapped handle when its comparator reports equality. Chaining does not add automatic dependency tracking or multi-source graphs.
+
+```rust
+let count = store.select(|context| context.count, |left, right| left == right);
+let parity = count.map(|count| count % 2, |left, right| left == right);
+let label = parity.map(|parity| format!("parity: {parity}"), |left, right| left == right);
+```
+
+Plain reads remain current without subscribing. Live mapped listeners share an upstream observer attachment, which detaches after the last explicit unsubscribe. Dropping a selection handle or its returned subscription does not cancel registered listeners. Mapped handles retain their source, so they remain usable after the original source handle is dropped.
+
+Dependency reads establish notification ordering before subscriptions become active. An unwatched chain recomputes on its next read, while comparator-equal results keep their cached value handles.
+
 Captured strong store or selection handles can form reference cycles in application callbacks. Explicitly unsubscribe when those callbacks are no longer needed.
 
 ## Reusing store behavior

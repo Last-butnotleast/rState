@@ -7,4 +7,4 @@ pub use selection::Selection;
 pub use subscription::Subscription;
 
 pub(crate) use emission::Emissions;
-pub(crate) use notify::Observers;
+pub(crate) use notify::{ObserverSlot, Observers};

@@ -25,16 +25,18 @@ impl FixtureStore {
         if !matches!(scenario, "counter" | "composition" | "ordering") {
             return Err(JsValue::from_str("unknown scenario"));
         }
-        let record = Rc::new(move |entry: Value| invoke(&recorder, entry));
+        let record = Rc::new(move |entry: Value| invoke(&recorder, &entry));
         Ok(Self::from_store(scenarios::create(scenario, record)))
     }
 
     pub fn send(&self, event: &str) -> Result<(), JsValue> {
-        self.store.send(parse(event)?).map_err(error)
+        self.store
+            .send(parse(event)?)
+            .map_err(|value| error(&value))
     }
 
     pub fn can(&self, event: &str) -> Result<bool, JsValue> {
-        self.store.can(parse(event)?).map_err(error)
+        self.store.can(parse(event)?).map_err(|value| error(&value))
     }
 
     pub fn snapshot(&self) -> String {
@@ -55,7 +57,7 @@ impl FixtureStore {
         let result = self
             .store
             .transition(self.store.get_snapshot(), parse(event)?)
-            .map_err(error)?;
+            .map_err(|value| error(&value))?;
         let snapshot = self.identities.borrow_mut().snapshot(result.snapshot);
         Ok(json!({"snapshot": snapshot, "effects": result.effects.len(), "allowed": result.allowed}).to_string())
     }
@@ -64,7 +66,7 @@ impl FixtureStore {
         let identities = self.identities.clone();
         let subscription = self.store.subscribe(move |snapshot| {
             let value = identities.borrow_mut().snapshot(snapshot);
-            invoke(&callback, value)
+            invoke(&callback, &value)
         });
         self.register(subscription)
     }
@@ -73,7 +75,7 @@ impl FixtureStore {
         self.register(self.store.on_any(move |message| {
             invoke(
                 &callback,
-                serde_json::to_value(message.as_ref()).map_err(StoreError::from_error)?,
+                &serde_json::to_value(message.as_ref()).map_err(StoreError::from_error)?,
             )
         }))
     }
@@ -84,7 +86,7 @@ impl FixtureStore {
             move |message| {
                 invoke(
                     &callback,
-                    serde_json::to_value(message.as_ref()).map_err(StoreError::from_error)?,
+                    &serde_json::to_value(message.as_ref()).map_err(StoreError::from_error)?,
                 )
             },
         ))
@@ -100,7 +102,7 @@ impl FixtureStore {
             move |context| if total { context.total } else { context.count },
             |left, right| left == right,
         );
-        Ok(self.register(selection.subscribe(move |value| invoke(&callback, json!(*value)))))
+        Ok(self.register(selection.subscribe(move |value| invoke(&callback, &json!(*value)))))
     }
 
     pub fn unsubscribe(&self, id: u32) {
@@ -140,7 +142,7 @@ fn parse(event: &str) -> Result<Event, JsValue> {
     serde_json::from_str(event).map_err(|value| JsValue::from_str(&value.to_string()))
 }
 
-fn invoke(callback: &Function, value: Value) -> StoreResult {
+pub(super) fn invoke(callback: &Function, value: &Value) -> StoreResult {
     callback
         .call1(&JsValue::UNDEFINED, &JsValue::from_str(&value.to_string()))
         .map(|_| ())
@@ -154,6 +156,6 @@ fn invoke(callback: &Function, value: Value) -> StoreResult {
         })
 }
 
-fn error(value: StoreError) -> JsValue {
+pub(super) fn error(value: &StoreError) -> JsValue {
     js_sys::Error::new(&value.to_string()).into()
 }
