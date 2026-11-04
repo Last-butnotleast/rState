@@ -48,6 +48,10 @@ These types represent complete application-facing choices or a concrete intercha
 
 `SnapshotStorage` and `SnapshotCodec` remain open traits intended for application implementations. New required methods or changed signatures require a major-version review; compatible new behavior should use defaults or separate optional interfaces.
 
+## Snapshot selection boundary
+
+`Store::select_snapshot` projects `&Snapshot<C>` and returns the existing `Selection<T>` handle. It shares context selections' lazy reads, snapshot identity cache, comparator-controlled value identity, explicit composition and cleanup semantics without adding context or selected-value trait bounds. Snapshot metadata is a native extension; it does not imply additional `@xstate/store` compatibility. History-only snapshots can change a snapshot projection while an equal context projection retains its value identity. Persistence bookkeeping remains outside this observation boundary.
+
 ## Dispatch errors report the owning call
 
 `send`, `reset`, `reset_with`, `undo` and `redo` retain their `StoreResult<()>` signatures. Their returned errors carry `Some(DispatchStatus::NotCommitted)` before that operation publishes its proposed state/history, or `Some(DispatchStatus::Committed)` after that boundary. `EffectScope::send` forwards the nested dispatch result unchanged. Snapshot identity is not used to guess the outcome: no-op events and empty undo/redo still cross the delivery boundary.

@@ -1,5 +1,6 @@
 mod combine;
 mod map;
+mod snapshot;
 
 use std::{cell::RefCell, rc::Rc};
 

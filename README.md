@@ -86,6 +86,17 @@ let _guard = store.subscribe(|snapshot| {
 
 `store.select(selector, comparator)` returns a cached `Selection`. Its selector projects only the supplied context; reads captured from other stores are not tracked. `Selection::get` returns a shared value handle. The explicit comparator decides whether a newly computed value replaces the cached one. Selected subscriptions suppress equal results and support the same explicit cleanup.
 
+`store.select_snapshot(selector, comparator)` projects `&Snapshot<C>` through the same selection API. Use it for snapshot metadata such as Undo and Redo availability. History-only changes can update these selections while equal context projections retain their shared value handles. Reads remain lazy, and `map`, `combine` and scoped subscriptions work as they do for context selections.
+
+```rust
+let can_undo = store.select_snapshot(
+    |snapshot| snapshot.history_status().past > 0,
+    |left, right| left == right,
+);
+```
+
+History availability describes the retained snapshots; restoring one may still fail current validation. Snapshot selectors do not observe persistence bookkeeping, which lives outside snapshots.
+
 Selections compose through one explicit dependency using `selection.map(project, comparator)`. Mapping is lazy, caches by the source value's identity, and retains the previous mapped handle when its comparator reports equality. Chaining does not add automatic dependency tracking.
 
 ```rust
@@ -256,6 +267,8 @@ For native controls, reset and undo/redo check the proposed context before commi
 `crates/rstate-wasm` is an unpublished browser test adapter. `test-app` runs real Rust/WASM and the pinned JavaScript reference over matching scenarios. It is development tooling, not a general JavaScript SDK.
 
 `conformance` owns shared scenario fixtures and their compatibility contract.
+
+`desktop/rstate-gpui` connects selections to GPUI views with scoped bindings and deferred, shared view notifications. Its separate desktop workspace keeps GPUI's platform dependencies and toolchain requirements out of the core and WASM workspace. See the [adapter guide](desktop/rstate-gpui/README.md) for the pinned engine, document example and desktop checks, and [GPUI_ADAPTER.md](GPUI_ADAPTER.md) for the staged design.
 
 ## Development
 

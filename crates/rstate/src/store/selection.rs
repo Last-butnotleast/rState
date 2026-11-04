@@ -12,6 +12,14 @@ impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
         selector: impl Fn(&C) -> T + 'static,
         compare: impl Fn(&T, &T) -> bool + 'static,
     ) -> Selection<T> {
+        self.select_snapshot(move |snapshot| selector(&snapshot.context), compare)
+    }
+
+    pub fn select_snapshot<T: 'static>(
+        &self,
+        selector: impl Fn(&Snapshot<C>) -> T + 'static,
+        compare: impl Fn(&T, &T) -> bool + 'static,
+    ) -> Selection<T> {
         let cache: RefCell<Cache<C, T>> = RefCell::new(None);
         let weak = Rc::downgrade(&self.inner);
         let source = self.inner.clone();
@@ -34,7 +42,7 @@ impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
                     }
                 }
 
-                let next = selector(&snapshot.context);
+                let next = selector(&snapshot);
                 let value = match previous {
                     Some((_, previous)) if compare(&previous, &next) => previous,
                     _ => Rc::new(next),

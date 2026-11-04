@@ -1,0 +1,37 @@
+name: Desktop
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: desktop
+    env:
+      CARGO_BUILD_JOBS: 2
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install desktop dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libclang-dev libfontconfig1-dev libssl-dev libwayland-dev libxkbcommon-x11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libvulkan-dev
+      - name: Install the repository Rust toolchain
+        run: rustup show active-toolchain
+      - name: Check desktop formatting
+        run: cargo fmt --all -- --check
+      - name: Check desktop lints
+        run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+      - name: Test desktop integration and build the example
+        run: cargo test --locked --workspace --all-targets --all-features

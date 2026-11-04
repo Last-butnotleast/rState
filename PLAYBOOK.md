@@ -143,6 +143,8 @@ For documentation-only changes, check the actual diff, local links, commands, an
 
 ## Verified checkpoint
 
+The GPUI foundation has a separate desktop workspace at `desktop`. Follow [the adapter guide](desktop/rstate-gpui/README.md) for its pinned engine, toolchain, system dependencies, deterministic integration tests and native document smoke test. Root Cargo commands intentionally retain only the core and WASM workspace. The first adapter increment adds snapshot selections to the core; task bridging, observable persistence feedback and an inspector remain later design stages in [GPUI_ADAPTER.md](GPUI_ADAPTER.md).
+
 At commit `6a59c23`, the final recorded verification was **131 all-feature native tests, 130 without default features, and 48 browser tests**, plus formatting, strict host/WASM Clippy, Rust 1.85, and fresh WASM/TypeScript/production builds. Independent review closed with no remaining actionable findings. These are historical counts; discover and report the current results next session.
 
 Implemented scope is listed in `AGENTS.md` and the README: the event-driven store core, identity-aware snapshots, effects/emissions, factories, inspection, explicit derived selections, weak/scoped ownership, reset/history, synchronous snapshot persistence, and typed opt-in validation.

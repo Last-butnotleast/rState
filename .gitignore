@@ -1,4 +1,5 @@
 /target/
+/desktop/target/
 /test-app/node_modules/
 /test-app/dist/
 /test-app/.reference/

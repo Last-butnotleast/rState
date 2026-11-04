@@ -1,0 +1,27 @@
+[package]
+name = "rstate-gpui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Deferred selection bindings between rState and Zed GPUI"
+autotests = false
+publish = false
+
+[dependencies]
+gpui.workspace = true
+rstate.workspace = true
+
+[dev-dependencies]
+gpui = { workspace = true, features = ["test-support"] }
+
+[[test]]
+name = "desktop"
+path = "tests/main.rs"
+
+[[example]]
+name = "documents"
+path = "examples/documents/main.rs"
+
+[lints]
+workspace = true
