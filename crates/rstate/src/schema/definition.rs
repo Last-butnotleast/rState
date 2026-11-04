@@ -1,6 +1,6 @@
 use std::{fmt, rc::Rc};
 
-use crate::{SchemaCheck, SchemaMetadata, StoreResult};
+use crate::{SchemaCheck, SchemaMetadata, StoreError, StoreResult};
 
 type Check<T> = dyn Fn(&T) -> StoreResult<SchemaCheck>;
 
@@ -42,6 +42,6 @@ impl<T> Schema<T> {
     }
 
     pub fn check(&self, value: &T) -> StoreResult<SchemaCheck> {
-        (self.check)(value)
+        (self.check)(value).map_err(StoreError::without_dispatch_status)
     }
 }

@@ -16,10 +16,11 @@ fn inspection_reports_current_state_and_outer_noops_but_not_dry_runs() {
     let subscription = store
         .inspect(move |inspection| {
             observed.borrow_mut().push(describe(&inspection));
-            let snapshot = match inspection {
-                Inspection::Initial { snapshot }
-                | Inspection::Transition { snapshot, .. }
-                | Inspection::Control { snapshot, .. } => snapshot,
+            let (Inspection::Initial { snapshot, .. }
+            | Inspection::Transition { snapshot, .. }
+            | Inspection::Control { snapshot, .. }) = inspection
+            else {
+                return Ok(());
             };
             snapshots.borrow_mut().push(snapshot);
             Ok(())

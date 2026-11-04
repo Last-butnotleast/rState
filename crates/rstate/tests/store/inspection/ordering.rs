@@ -71,7 +71,10 @@ fn subscriber_nested_dispatch_is_inspected_before_the_outer_transition() {
     let current = store.clone();
     let inspector = store
         .inspect(move |inspection| {
-            if let Inspection::Transition { event, snapshot } = inspection {
+            if let Inspection::Transition {
+                event, snapshot, ..
+            } = inspection
+            {
                 let by = match event {
                     Event::Add(by) => *by,
                     _ => return Ok(()),
@@ -101,7 +104,10 @@ fn inspector_nested_dispatch_retains_each_outer_record_snapshot() {
     let nested = store.clone();
     let first = store
         .inspect(move |inspection| {
-            if let Inspection::Transition { event, snapshot } = inspection {
+            if let Inspection::Transition {
+                event, snapshot, ..
+            } = inspection
+            {
                 first_trace
                     .borrow_mut()
                     .push(format!("a:{}", snapshot.context.count));

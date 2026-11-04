@@ -1,6 +1,9 @@
 use std::rc::Rc;
 
-use crate::{Effect, Snapshot, StoreResult, TransitionResult, ValidationStage, transition::reduce};
+use crate::{
+    DispatchStatus, Effect, Snapshot, StoreError, StoreResult, TransitionResult, ValidationStage,
+    transition::reduce,
+};
 
 use super::{Store, commit::Action};
 
@@ -10,7 +13,9 @@ impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
         snapshot: Rc<Snapshot<C>>,
         event: E,
     ) -> StoreResult<TransitionResult<C, E, M>> {
-        let result = self.evaluate(&snapshot, &event);
+        let result = self
+            .evaluate(&snapshot, &event)
+            .map_err(StoreError::without_dispatch_status);
         drop(snapshot);
         drop(event);
         result
@@ -26,7 +31,9 @@ impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
 
     pub fn send(&self, event: E) -> StoreResult<()> {
         let previous = self.get_snapshot();
-        let result = self.evaluate(&previous, &event)?;
+        let result = self
+            .evaluate(&previous, &event)
+            .map_err(|error| error.with_dispatch_status(DispatchStatus::NotCommitted))?;
         self.commit(result.snapshot, &Action::Event(&event), result.effects)?;
         drop(event);
         Ok(())

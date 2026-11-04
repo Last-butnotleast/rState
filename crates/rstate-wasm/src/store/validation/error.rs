@@ -10,12 +10,14 @@ pub fn annotate(error: &Error, validation: &ValidationError) {
         ValidationReason::InvalidEmitted => "invalidEmitted",
         ValidationReason::UnknownEvent => "unknownEvent",
         ValidationReason::UnknownEmitted => "unknownEmitted",
+        _ => "unknown",
     };
     let stage = match validation.stage {
         ValidationStage::InitialContext => "initialContext",
         ValidationStage::Event => "event",
         ValidationStage::Context => "context",
         ValidationStage::Emitted => "emitted",
+        _ => "unknown",
     };
     let issues: Vec<_> = validation
         .issues

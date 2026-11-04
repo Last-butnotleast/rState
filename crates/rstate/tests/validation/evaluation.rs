@@ -4,8 +4,8 @@ use std::{
 };
 
 use rstate::{
-    Inspection, Schema, SchemaCheck, SchemaMetadata, Schemas, Store, StoreConfig, Update,
-    ValidationOptions, ValidationStage,
+    DispatchStatus, Inspection, Schema, SchemaCheck, SchemaMetadata, Schemas, Store, StoreConfig,
+    Update, ValidationOptions, ValidationStage,
 };
 
 use crate::validation::support::{Event, Message, config, context, schemas, trace};
@@ -77,6 +77,10 @@ fn invalid_outer_events_do_not_run_reducers_or_change_history_and_observers() {
 
     let failure = store.send(Event::Add(-1)).unwrap_err();
     assert_eq!(
+        failure.dispatch_status(),
+        Some(DispatchStatus::NotCommitted)
+    );
+    assert_eq!(
         failure.validation_error().unwrap().stage,
         ValidationStage::Event
     );
@@ -100,6 +104,10 @@ fn context_checks_only_the_final_macrostep_and_dry_runs_leave_history_untouched(
     trace.borrow_mut().clear();
 
     let rejected = store.send(Event::Break).unwrap_err();
+    assert_eq!(
+        rejected.dispatch_status(),
+        Some(DispatchStatus::NotCommitted)
+    );
     assert_eq!(
         rejected.validation_error().unwrap().stage,
         ValidationStage::Context
@@ -184,6 +192,10 @@ fn emitted_checks_finish_before_any_mixed_effect_or_emission_runs() {
     trace.borrow_mut().clear();
 
     let failure = store.send(Event::Emit(-1)).unwrap_err();
+    assert_eq!(
+        failure.dispatch_status(),
+        Some(DispatchStatus::NotCommitted)
+    );
     assert_eq!(
         failure.validation_error().unwrap().stage,
         ValidationStage::Emitted

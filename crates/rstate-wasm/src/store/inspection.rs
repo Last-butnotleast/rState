@@ -13,19 +13,25 @@ pub(super) fn notify(
     callback: &Function,
 ) -> StoreResult {
     let (event, snapshot) = match record {
-        Inspection::Initial { snapshot } => (json!({ "type": "@xstate.init" }), snapshot),
-        Inspection::Transition { event, snapshot } => (
+        Inspection::Initial { snapshot, .. } => (json!({ "type": "@xstate.init" }), snapshot),
+        Inspection::Transition {
+            event, snapshot, ..
+        } => (
             serde_json::to_value(event).map_err(StoreError::from_error)?,
             snapshot,
         ),
-        Inspection::Control { action, snapshot } => (
+        Inspection::Control {
+            action, snapshot, ..
+        } => (
             json!({ "type": match action {
                 ControlAction::Reset => "reset",
                 ControlAction::Undo => "undo",
                 ControlAction::Redo => "redo",
+                _ => return Err(StoreError::new("unsupported inspection control")),
             } }),
             snapshot,
         ),
+        _ => return Err(StoreError::new("unsupported inspection record")),
     };
     let snapshot = identities.borrow_mut().snapshot(snapshot);
     invoke(callback, &json!({ "event": event, "snapshot": snapshot }))

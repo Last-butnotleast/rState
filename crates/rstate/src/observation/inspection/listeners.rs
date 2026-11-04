@@ -39,7 +39,10 @@ impl<C: 'static, E: 'static> Inspectors<C, E> {
     ) -> StoreResult<Subscription> {
         let listener: Rc<Listener<C, E>> = Rc::new(listener);
         let subscription = self.register(listener.clone());
-        listener(Inspection::Initial { snapshot })?;
+        if let Err(error) = listener(Inspection::Initial { snapshot }) {
+            subscription.unsubscribe();
+            return Err(error.without_dispatch_status());
+        }
         Ok(subscription)
     }
 

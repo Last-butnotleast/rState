@@ -48,13 +48,12 @@ enum Policy {
 
 impl Configuration {
     pub fn options(&self) -> ValidationOptions {
-        ValidationOptions {
-            context: self.checks.context,
-            events: self.checks.events,
-            emitted: self.checks.emitted,
-            unknown_events: self.unknown_events.into(),
-            unknown_emitted: self.unknown_emitted.into(),
-        }
+        ValidationOptions::default()
+            .with_context(self.checks.context)
+            .with_events(self.checks.events)
+            .with_emitted(self.checks.emitted)
+            .with_unknown_events(self.unknown_events.into())
+            .with_unknown_emitted(self.unknown_emitted.into())
     }
 }
 

@@ -4,6 +4,8 @@ use rstate::{Store, StoreConfig, Update};
 
 use crate::support::{Event, counter};
 
+mod errors;
+
 #[test]
 fn send_commits_and_notifies_synchronously_before_returning() {
     let store = counter();

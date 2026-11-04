@@ -2,6 +2,7 @@ use std::{fmt, rc::Rc};
 
 use crate::{Effect, Snapshot};
 
+#[non_exhaustive]
 pub struct TransitionResult<C, E, M = ()> {
     pub snapshot: Rc<Snapshot<C>>,
     pub effects: Vec<Effect<C, E, M>>,

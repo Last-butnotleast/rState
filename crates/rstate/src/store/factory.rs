@@ -1,6 +1,8 @@
 use std::{fmt, rc::Rc};
 
-use crate::{Enqueue, Schemas, Store, StoreConfig, StoreResult, Update, transition::Reducer};
+use crate::{
+    Enqueue, Schemas, Store, StoreConfig, StoreError, StoreResult, Update, transition::Reducer,
+};
 
 type Initializer<I, C> = dyn Fn(I) -> StoreResult<C>;
 
@@ -64,7 +66,8 @@ impl<I, C: 'static, E: 'static, M: 'static> StoreFactory<I, C, E, M> {
     }
 
     pub(crate) fn config(&self, input: I) -> StoreResult<StoreConfig<C, E, M>> {
-        let initial = Rc::new((self.initializer)(input)?);
+        let initial =
+            Rc::new((self.initializer)(input).map_err(StoreError::without_dispatch_status)?);
         Ok(StoreConfig {
             initial,
             reducer: self.reducer.clone(),

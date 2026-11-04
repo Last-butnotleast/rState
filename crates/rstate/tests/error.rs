@@ -1,6 +1,9 @@
 use std::{error::Error, io, rc::Rc};
 
-use rstate::{Store, StoreConfig, StoreError};
+use rstate::{
+    SchemaMetadata, Store, StoreConfig, StoreError, ValidationError, ValidationIssue,
+    ValidationReason, ValidationStage,
+};
 
 #[derive(Debug, thiserror::Error)]
 #[error("application operation failed")]
@@ -44,6 +47,7 @@ fn external_error_exposes_the_original_concrete_source() {
     assert_eq!(original.kind(), io::ErrorKind::NotFound);
     assert_eq!(error.to_string(), "missing state");
     assert!(source.source().is_none());
+    assert_eq!(error.dispatch_status(), None);
 }
 
 #[test]
@@ -68,4 +72,26 @@ fn callback_messages_remain_errors_without_a_source() {
 
     assert_eq!(error.to_string(), "callback rejected the event");
     assert!(error.source().is_none());
+    assert_eq!(error.dispatch_status(), None);
+}
+
+#[test]
+fn structured_validation_errors_can_be_constructed_by_downstream_providers() {
+    let validation = ValidationError::new(
+        ValidationStage::Event,
+        ValidationReason::InvalidEvent,
+        SchemaMetadata::new("event schema").with_vendor("application"),
+    )
+    .named("submit")
+    .with_issues(vec![ValidationIssue::new("missing title")]);
+    let error = StoreError::from(validation.clone());
+
+    assert_eq!(error.validation_error(), Some(&validation));
+    assert_eq!(error.dispatch_status(), None);
+    assert_eq!(error.to_string(), "Invalid event \"submit\"");
+    assert_eq!(
+        error.source().unwrap().downcast_ref::<ValidationError>(),
+        Some(&validation)
+    );
+    assert_eq!(validation.schema.vendor.as_deref(), Some("application"));
 }

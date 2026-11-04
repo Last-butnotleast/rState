@@ -1,4 +1,5 @@
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct SchemaMetadata {
     pub name: String,
     pub vendor: Option<String>,

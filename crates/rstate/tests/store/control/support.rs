@@ -60,12 +60,17 @@ pub(super) fn config(initial: i32, trace: &Trace) -> StoreConfig<Context, Event,
 
 pub(super) fn describe(record: Inspection<'_, Context, Event>) -> String {
     match record {
-        Inspection::Initial { snapshot } => format!("init:{}", snapshot.context.count),
-        Inspection::Transition { event, snapshot } => {
+        Inspection::Initial { snapshot, .. } => format!("init:{}", snapshot.context.count),
+        Inspection::Transition {
+            event, snapshot, ..
+        } => {
             format!("event:{event:?}:{}", snapshot.context.count)
         }
-        Inspection::Control { action, snapshot } => {
+        Inspection::Control {
+            action, snapshot, ..
+        } => {
             format!("control:{action:?}:{}", snapshot.context.count)
         }
+        _ => "other inspection".into(),
     }
 }

@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::{ControlAction, Effect, EffectScope, Snapshot, StoreResult};
+use crate::{ControlAction, DispatchStatus, Effect, EffectScope, Snapshot, StoreResult};
 
 use super::Store;
 
@@ -32,13 +32,17 @@ impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
         self.inner.current.replace(snapshot.clone());
 
         if !Rc::ptr_eq(&previous, &snapshot) {
-            self.inner.observers.publish()?;
+            self.inner
+                .observers
+                .publish()
+                .map_err(|error| error.with_dispatch_status(DispatchStatus::Committed))?;
         }
 
         match action {
-            Action::Event(event) => self.inner.inspectors.notify(event, &snapshot)?,
-            Action::Control(action) => self.inner.inspectors.control(*action, &snapshot)?,
+            Action::Event(event) => self.inner.inspectors.notify(event, &snapshot),
+            Action::Control(action) => self.inner.inspectors.control(*action, &snapshot),
         }
+        .map_err(|error| error.with_dispatch_status(DispatchStatus::Committed))?;
 
         if let Some((state, epoch)) = self.inner.persistence.as_ref().zip(epoch) {
             state.autosave(&snapshot.context, revision, epoch);
@@ -47,9 +51,10 @@ impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
         let scope = EffectScope::new(self.clone(), snapshot);
         for effect in effects {
             match effect {
-                Effect::Emit(message) => self.inner.emissions.emit(&message)?,
-                Effect::Run(effect) => effect(scope.clone())?,
+                Effect::Emit(message) => self.inner.emissions.emit(&message),
+                Effect::Run(effect) => effect(scope.clone()),
             }
+            .map_err(|error| error.with_dispatch_status(DispatchStatus::Committed))?;
         }
         scope.complete();
         Ok(())

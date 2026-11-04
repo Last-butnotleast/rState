@@ -5,6 +5,7 @@ pub enum PathSegment {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ValidationIssue {
     pub message: String,
     pub path: Vec<PathSegment>,

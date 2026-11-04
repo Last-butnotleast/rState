@@ -189,7 +189,7 @@ test("live inspector additions removals and initial nested registration keep dis
   expect(results[0].count).toBe(3);
 });
 
-test("inspection errors preserve registration and committed state with fail fast delivery", async ({
+test("inspection transition errors preserve committed state with fail fast delivery", async ({
   page,
 }) => {
   await page.goto("/");
@@ -213,20 +213,6 @@ test("inspection errors preserve registration and committed state with fail fast
         }
       };
       try {
-        let failInitial = true;
-        const initialError = attempt(() =>
-          engine.inspect((record: any) => {
-            trace.push({
-              kind: "orphan",
-              event: record.event.type,
-              count: record.snapshot.context.count,
-            });
-            if (failInitial) {
-              failInitial = false;
-              throw new Error("initial failed");
-            }
-          }),
-        );
         const bad = engine.inspect((record: any) => {
           trace.push({
             kind: "bad",
@@ -259,7 +245,6 @@ test("inspection errors preserve registration and committed state with fail fast
         trace.length = 0;
         engine.send({ type: "start" });
         return {
-          initialError,
           dispatchError,
           subscriberError,
           afterFailure,
@@ -273,22 +258,90 @@ test("inspection errors preserve registration and committed state with fail fast
   });
   expect(results[0]).toEqual(results[1]);
   expect(results[0]).toMatchObject({
-    initialError: "initial failed",
     dispatchError: "inspection failed",
     subscriberError: "subscriber failed",
     afterFailure: {
       trace: [
         { kind: "observe", count: 1 },
-        { kind: "orphan", event: "start", count: 1 },
         { kind: "bad", event: "start", count: 1 },
       ],
     },
     afterSubscriberFailure: [{ kind: "observe", count: 2 }],
   });
   expect(
-    results[0].recovered.some((entry: any) => entry.kind === "orphan"),
-  ).toBe(true);
-  expect(
     results[0].recovered.filter((entry: any) => entry.kind === "effect"),
   ).toHaveLength(2);
+});
+
+test("failed native inspection registration cleans up after synchronous reentry while upstream retains it", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(
+    page.getByRole("button", { name: "Increment", exact: true }),
+  ).toBeEnabled();
+  const results = await page.evaluate(async () => {
+    const rustPath = "/src/engines/rust.ts";
+    const referencePath = "/src/engines/reference.ts";
+    const { createRust } = await import(rustPath);
+    const { createReference } = await import(referencePath);
+    return [createRust, createReference].map((create) => {
+      const engine = create("counter", () => {});
+      const trace: string[] = [];
+      let child = () => {};
+      engine.inspect((record: any) => {
+        trace.push(`valid:${record.event.type}:${record.snapshot.context.count}`);
+      });
+      let failure: { message: string; dispatchStatus: unknown } | undefined;
+      try {
+        try {
+          engine.inspect((record: any) => {
+            trace.push(
+              `failed:${record.event.type}:${record.snapshot.context.count}`,
+            );
+            if (record.event.type === "@xstate.init") {
+              child = engine.inspect((nested: any) => {
+                trace.push(
+                  `child:${nested.event.type}:${nested.snapshot.context.count}`,
+                );
+              });
+              engine.send({ type: "inc", by: 1 });
+              throw new Error("initial failed");
+            }
+          });
+        } catch (error) {
+          failure = {
+            message: (error as Error).message,
+            dispatchStatus: (error as { dispatchStatus?: string }).dispatchStatus ?? null,
+          };
+        }
+        const initial = [...trace];
+        trace.length = 0;
+        engine.send({ type: "inc", by: 1 });
+        child();
+        const retained = [...trace];
+        trace.length = 0;
+        engine.send({ type: "inc", by: 1 });
+        return { failure, initial, retained, detached: trace, count: engine.snapshot().context.count };
+      } finally {
+        engine.dispose();
+      }
+    });
+  });
+  expect(results[0].failure).toEqual({ message: "initial failed", dispatchStatus: null });
+  expect(results[1].failure).toEqual(results[0].failure);
+  expect(results[0].initial).toEqual(results[1].initial);
+  expect(results[0].initial).toEqual([
+    "valid:@xstate.init:0",
+    "failed:@xstate.init:0",
+    "child:@xstate.init:0",
+    "valid:inc:1",
+    "failed:inc:1",
+    "child:inc:1",
+  ]);
+  expect(results[0].retained).toEqual(["valid:inc:2", "child:inc:2"]);
+  expect(results[1].retained).toEqual(["valid:inc:2", "failed:inc:2", "child:inc:2"]);
+  expect(results[0].detached).toEqual(["valid:inc:3"]);
+  expect(results[1].detached).toEqual(["valid:inc:3", "failed:inc:3"]);
+  expect(results.map((result) => result.count)).toEqual([3, 3]);
 });

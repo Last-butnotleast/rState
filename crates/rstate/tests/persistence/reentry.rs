@@ -206,7 +206,7 @@ fn explicit_operations_during_storage_callbacks_return_typed_errors_without_dead
                 .unwrap()
                 .downcast_ref::<PersistenceError>()
                 .unwrap();
-            if let PersistenceError::Reentrant { operation } = original {
+            if let PersistenceError::Reentrant { operation, .. } = original {
                 recorded.borrow_mut().push(*operation);
             }
         }

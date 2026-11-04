@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use js_sys::Function;
-use rstate::{StoreError, StoreResult, Subscription};
+use rstate::{DispatchStatus, StoreError, StoreResult, Subscription};
 use serde_json::{Value, json};
 use wasm_bindgen::prelude::*;
 
@@ -189,6 +189,17 @@ pub(super) fn invoke(callback: &Function, value: &Value) -> StoreResult {
 
 pub(super) fn error(value: &StoreError) -> JsValue {
     let error = js_sys::Error::new(&value.to_string());
+    if let Some(status) = value.dispatch_status() {
+        let status = match status {
+            DispatchStatus::NotCommitted => "notCommitted",
+            DispatchStatus::Committed => "committed",
+        };
+        let _ = js_sys::Reflect::set(
+            &error,
+            &JsValue::from_str("dispatchStatus"),
+            &JsValue::from_str(status),
+        );
+    }
     if let Some(validation) = value.validation_error() {
         super::validation::error::annotate(&error, validation);
     }

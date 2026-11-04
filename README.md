@@ -4,6 +4,8 @@ A small synchronous Rust state store with typed events, shared snapshots, pure t
 
 The selected behavior follows [`@xstate/store` 4.3.0 at commit `9b3a88f`](https://github.com/statelyai/xstate/tree/9b3a88fa43f4be5433797acfba18f27c40494bd2/packages/xstate-store). This is a core implementation, not a port of the complete package or its extensions.
 
+[API_STABILITY.md](API_STABILITY.md) records the pre-1.0 public API decisions, extensible types, dispatch failure contract and intentional inspection-cleanup difference from the reference.
+
 ## Using the store
 
 ```rust
@@ -42,6 +44,26 @@ subscription.unsubscribe();
 ```
 
 Reducers return `StoreResult<Update<Context>>`. Use `StoreError::new` for a callback failure or `StoreError::from_error` to retain an application error as its direct source, including its existing source chain. External errors must implement `Error + Send + Sync + 'static`, so `StoreError` can propagate into application error containers such as `Box<dyn Error + Send + Sync>` or `anyhow::Error`. These bounds apply to external errors, not to store contexts, events or callbacks. Callback failures are recoverable results; Rust panics are programming faults rather than JavaScript-compatible exceptions.
+
+`StoreError` has an opaque representation. Read validation details through `validation_error()`, application causes through `Error::source()`, and dispatch outcome through `dispatch_status()`. `send`, `reset`, `reset_with`, `undo` and `redo` return errors marked `Some(DispatchStatus::NotCommitted)` when that call fails before its commit boundary, or `Some(DispatchStatus::Committed)` when delivery fails after committing. The method signatures remain `StoreResult<()>`; an error does not imply rollback.
+
+```rust
+use rstate::DispatchStatus;
+
+if let Err(error) = store.send(Event::Increment(1)) {
+    match error.dispatch_status() {
+        Some(DispatchStatus::Committed) => {
+            eprintln!("state committed, delivery failed: {error}");
+        }
+        Some(DispatchStatus::NotCommitted) => {
+            eprintln!("this event did not commit: {error}");
+        }
+        None => eprintln!("operation failed: {error}"),
+    }
+}
+```
+
+The status describes the reporting call, including an unchanged-context or empty-history commit. It does not describe the latest live snapshot or whether callbacks dispatched other events: nested operations can commit even when the outer call is `NotCommitted`, and later nested state can supersede a `Committed` snapshot. Do not retry an event automatically based on status alone. Pure `transition` and `can` queries, schema checks, initialization, inspection registration and explicit persistence errors have no dispatch status; propagated nested dispatch metadata is cleared at those operation boundaries.
 
 `Update::Keep` retains context and snapshot identity. `Update::Replace` replaces the complete context; equal contents do not imply equal identity. Returning the existing context handle preserves snapshot identity while making `can` true. Contexts, events and selected values do not need `Clone`, `Serialize`, `Send` or `Sync`.
 
@@ -134,15 +156,16 @@ use rstate::Inspection;
 
 let inspection = store.inspect(|record| {
     match record {
-        Inspection::Initial { snapshot } => {
+        Inspection::Initial { snapshot, .. } => {
             println!("initial count: {}", snapshot.context.count);
         }
         Inspection::Transition { snapshot, .. } => {
             println!("transition count: {}", snapshot.context.count);
         }
-        Inspection::Control { action, snapshot } => {
+        Inspection::Control { action, snapshot, .. } => {
             println!("{action:?} count: {}", snapshot.context.count);
         }
+        _ => {}
     }
     Ok(())
 }).unwrap();
@@ -154,7 +177,7 @@ A transition record borrows its event for the callback and owns a shared snapsho
 
 State is committed before ordinary and selected subscribers run, followed by inspectors and then effects or emitted events. Subscriber failure skips inspection and effects. Inspector failure stops later inspectors and effects while retaining committed state. Internal queued triggers produce one final outer record; `can` and pure `transition` queries produce no inspection records.
 
-Inspector iteration follows live registration order: removing a listener before its turn skips it, while adding a listener during notification gives it an immediate initial record and then the current transition record. Registration precedes the immediate callback. If that callback fails, `inspect` returns its error while the registration remains active and no unsubscribe handle is returned, matching the reference behavior.
+Inspector iteration follows live registration order: removing a listener before its turn skips it, while adding a listener during notification gives it an immediate initial record and then the current transition record. Registration precedes the immediate callback, so a nested dispatch can notify that inspector. If the initial callback returns an error, `inspect` removes only that registration before returning the error. Its captured values are released outside interior borrows; nested state changes and other registrations remain intact. This native cleanup policy intentionally differs from the reference, which retains an inaccessible failed registration. A successful registration keeps ordinary explicit-unsubscribe behavior.
 
 ## Reset and snapshot history
 
@@ -222,7 +245,7 @@ Checks run on the outer incoming event before the reducer, the final macrostep c
 
 `SchemaCheck::invalid(issues).named(name)` rejects a value with structured issues; `SchemaCheck::unknown(name)` classifies an unsupported event or emitted variant. A callback can return `Valid` for known variants without their own validation rule. `ValidationOptions` defaults to checking every scope and rejecting unknown event/emitted variants; individual scopes can be disabled and either unknown policy can be set to `UnknownPolicy::Ignore`. `ValidationIssue` paths contain explicit `PathSegment::Field` and `PathSegment::Index` values. Returning `Unknown` from a context schema rejects the context.
 
-Validation failures return `StoreError::Validation` with `ValidationError` fields for stage, reason, schema metadata, optional value name and issues. The error is available through `StoreError::validation_error()` and `Error::source()`, without retaining the original context or payload. Provider failures returned as unrelated `StoreError` values propagate unchanged. `can` returns false for validation failures and propagates other errors. Pure `transition` and `can` run checks but do not commit state/history, notify, inspect, execute effects or write storage; schema callbacks must remain pure like reducers.
+Validation failures return an opaque `StoreError` containing a `ValidationError` with stage, reason, schema metadata, optional value name and issues. Read it through `StoreError::validation_error()` or `Error::source()`, without retaining the original context or payload. Provider failures retain their displayed message and causal chain; dispatch status describes the operation returning them. `can` returns false for validation failures and propagates other errors. Pure `transition` and `can` run checks but do not commit state/history, notify, inspect, execute effects or write storage; schema callbacks must remain pure like reducers.
 
 For native controls, reset and undo/redo check the proposed context before committing, without inventing a domain event. This protects the validated-store invariant even when schema rules capture changing application configuration. Structural `can_undo` and `can_redo` report history availability, while a subsequent restore can still fail validation. Rejected controls leave current state, history and storage unchanged. Validating configured defaults, hydrated state and native controls is an explicit native composition policy; arbitrary upstream extension ordering is not reproduced. Async validators and JSON Schema interpretation are outside this typed synchronous interface.
 

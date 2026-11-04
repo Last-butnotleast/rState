@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::{ControlAction, HistoryStatus, Snapshot, StoreResult, ValidationStage};
+use crate::{ControlAction, DispatchStatus, HistoryStatus, Snapshot, StoreResult, ValidationStage};
 
 use super::{Store, commit::Action};
 
@@ -14,8 +14,10 @@ impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
         reset: impl FnOnce(&Rc<C>, &Rc<C>) -> StoreResult<Rc<C>>,
     ) -> StoreResult<()> {
         let previous = self.get_snapshot();
-        let context = reset(&self.inner.defaults, &previous.context)?;
-        self.validate_context(&context, ValidationStage::Context)?;
+        let context = reset(&self.inner.defaults, &previous.context)
+            .map_err(|error| error.with_dispatch_status(DispatchStatus::NotCommitted))?;
+        self.validate_context(&context, ValidationStage::Context)
+            .map_err(|error| error.with_dispatch_status(DispatchStatus::NotCommitted))?;
         let snapshot = Rc::new(previous.record(context, self.inner.history_limit));
         self.commit(snapshot, &Action::Control(ControlAction::Reset), Vec::new())
     }
@@ -53,7 +55,8 @@ impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
                 history: Some(Rc::new(history)),
             })
         });
-        self.validate_context(&snapshot.context, ValidationStage::Context)?;
+        self.validate_context(&snapshot.context, ValidationStage::Context)
+            .map_err(|error| error.with_dispatch_status(DispatchStatus::NotCommitted))?;
         self.commit(snapshot, &Action::Control(action), Vec::new())
     }
 }

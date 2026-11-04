@@ -12,7 +12,7 @@ mod validation;
 
 pub use control::ControlAction;
 pub use effects::{Effect, EffectScope, Enqueue};
-pub use error::{StoreError, StoreResult};
+pub use error::{DispatchStatus, StoreError, StoreResult};
 pub use history::HistoryStatus;
 pub use observation::{Inspection, ScopedSubscription, Selection, Subscription};
 #[cfg(feature = "json")]

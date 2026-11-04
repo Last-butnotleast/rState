@@ -65,8 +65,10 @@ pub(super) fn store(trace: &Trace) -> Fixture {
 
 pub(super) fn describe(inspection: &Inspection<'_, Context, Event>) -> String {
     match inspection {
-        Inspection::Initial { snapshot } => format!("init:{}", snapshot.context.count),
-        Inspection::Transition { event, snapshot } => {
+        Inspection::Initial { snapshot, .. } => format!("init:{}", snapshot.context.count),
+        Inspection::Transition {
+            event, snapshot, ..
+        } => {
             let name = match event {
                 Event::Add(by) => format!("add:{by}"),
                 Event::Keep => "keep".into(),
@@ -79,8 +81,11 @@ pub(super) fn describe(inspection: &Inspection<'_, Context, Event>) -> String {
             };
             format!("inspect:{name}:{}", snapshot.context.count)
         }
-        Inspection::Control { action, snapshot } => {
+        Inspection::Control {
+            action, snapshot, ..
+        } => {
             format!("inspect:{action:?}:{}", snapshot.context.count)
         }
+        _ => "other inspection".into(),
     }
 }

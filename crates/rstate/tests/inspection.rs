@@ -29,14 +29,14 @@ fn inspection_debug_formats_borrowed_events_and_shared_snapshots() {
         .inspect(move |inspection| {
             recorded.borrow_mut().push(format!("{inspection:?}"));
             match inspection {
-                Inspection::Initial { snapshot } => {
+                Inspection::Initial { snapshot, .. } => {
                     initial.set(Rc::ptr_eq(&snapshot, &initial_snapshot));
                 }
                 Inspection::Transition { event, .. } => {
                     borrowed.set(std::ptr::eq(std::ptr::from_ref(event), reducer_event.get()));
                     recorded.borrow_mut().push(format!("value:{}", event.value));
                 }
-                Inspection::Control { .. } => {}
+                _ => {}
             }
             Ok(())
         })

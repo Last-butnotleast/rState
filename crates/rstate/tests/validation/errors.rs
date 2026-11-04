@@ -101,10 +101,7 @@ fn validation_options_disable_only_the_selected_area_or_unknown_policy() {
     let trace = trace();
     let events_disabled = Store::new_validated(
         config(4, &trace).with_schemas(schemas(&trace, Rc::new(Cell::new(0)))),
-        ValidationOptions {
-            events: false,
-            ..ValidationOptions::default()
-        },
+        ValidationOptions::default().with_events(false),
     )
     .unwrap();
     trace.borrow_mut().clear();
@@ -119,10 +116,7 @@ fn validation_options_disable_only_the_selected_area_or_unknown_policy() {
 
     let context_disabled = Store::new_validated(
         config(-1, &trace).with_schemas(schemas(&trace, Rc::new(Cell::new(0)))),
-        ValidationOptions {
-            context: false,
-            ..ValidationOptions::default()
-        },
+        ValidationOptions::default().with_context(false),
     )
     .unwrap();
     trace.borrow_mut().clear();
@@ -137,10 +131,7 @@ fn validation_options_disable_only_the_selected_area_or_unknown_policy() {
 
     let emitted_disabled = Store::new_validated(
         config(0, &trace).with_schemas(schemas(&trace, Rc::new(Cell::new(0)))),
-        ValidationOptions {
-            emitted: false,
-            ..ValidationOptions::default()
-        },
+        ValidationOptions::default().with_emitted(false),
     )
     .unwrap();
     trace.borrow_mut().clear();
@@ -158,11 +149,9 @@ fn validation_options_disable_only_the_selected_area_or_unknown_policy() {
 
     let unknown_allowed = Store::new_validated(
         config(0, &trace).with_schemas(schemas(&trace, Rc::new(Cell::new(0)))),
-        ValidationOptions {
-            unknown_events: UnknownPolicy::Ignore,
-            unknown_emitted: UnknownPolicy::Ignore,
-            ..ValidationOptions::default()
-        },
+        ValidationOptions::default()
+            .with_unknown_events(UnknownPolicy::Ignore)
+            .with_unknown_emitted(UnknownPolicy::Ignore),
     )
     .unwrap();
     unknown_allowed.send(Event::Unknown).unwrap();
