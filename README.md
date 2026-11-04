@@ -158,6 +158,48 @@ For a database transaction, load a row into a snapshot, calculate a proposal, ch
 
 The core already supports `default-features = false` without serialization adapters, async runtimes or background threads. CI checks that configuration for `wasm32-unknown-unknown`; this is a core compilation check, with SpacetimeDB SDK compatibility to be verified by its integration example.
 
+## Declarative commands and transition outcomes
+
+Use the existing emitted-value type for application commands. `enqueue.emit(command)` collects strongly typed data in the same deterministic order as other emissions, including internal FIFO triggers. rState does not interpret these values during a pure transition. There is no separate command queue or command runtime in the core.
+
+```rust
+use std::rc::Rc;
+use rstate::{Snapshot, Transition, TransitionOutcome, Update};
+
+enum Command {
+    ScheduleJob { job_id: u64 },
+}
+
+let jobs: Transition<bool, u64, Command> = Transition::new(|_, job_id, enqueue| {
+    enqueue.emit(Command::ScheduleJob { job_id: *job_id });
+    Ok(Update::replace(true))
+});
+let loaded = Rc::new(Snapshot::new(Rc::new(false)));
+let outcome = jobs.outcome_with_guard(&loaded, 42, |snapshot, _| {
+    if *snapshot.context {
+        Err("job already running")
+    } else {
+        Ok(())
+    }
+}).unwrap();
+
+if let TransitionOutcome::Applied { result } = outcome {
+    let proposal = result.into_commands().unwrap();
+    assert!(*proposal.snapshot.context);
+    assert!(matches!(proposal.commands.first().map(Rc::as_ref),
+        Some(Command::ScheduleJob { job_id: 42 })));
+}
+assert!(!*loaded.context);
+```
+
+`TransitionResult::into_commands()` consumes an emissions-only proposal and returns `CommandResult { snapshot, commands, allowed }`. Commands are `Vec<Rc<M>>`, preserving shared value identity and supporting payloads without `Clone`. If any `Effect::Run` callback is present, conversion returns `Err` containing the complete original `TransitionResult`, including every emission and callback in order. It neither executes nor silently drops callbacks. An application can reject that proposal rather than persist an incomplete command list.
+
+Applications can derive Serde traits on their command enums and serialize references from `proposal.commands.iter().map(Rc::as_ref).collect::<Vec<_>>()`. This does not require Serde's `rc` feature or a serialization bound on rState contexts or command payloads. Persist the proposed context and commands in the consuming database's transaction; loading, execution, retries and delivery remain application responsibilities.
+
+`Transition::outcome(snapshot, event)` wraps the existing pure transition with explicit `TransitionOutcome` variants. `Applied { result }` retains the proposed snapshot and effects, including command-only transitions and explicit same-context replacements. `Unavailable` means the existing `allowed` result was false. `ValidationFailed { error }` retains the original `StoreError`, its validation stage/details and source. Other reducer or schema-provider failures remain `Err(StoreError)`. Pure-query errors carry no dispatch status.
+
+`outcome_with_guard(snapshot, event, guard)` additionally accepts an application closure returning `Result<(), Reason>`. A failed guard returns `Rejected { reason }` before validators or reducers run, with no proposal or executable effects. Reasons can be application types without error, cloning, serialization or thread-safety bounds. The guard receives the externally supplied snapshot and outer event once; internal triggered events retain existing reduction and validation semantics. It may reenter synchronously. A successful guard is followed by the ordinary validation and transition path. Neither method modifies the supplied snapshot, and availability continues to describe reducer behavior rather than enforcing a lifecycle model.
+
 ## Reusing store behavior
 
 `StoreFactory::new(initializer, reducer)` defines reusable behavior. `factory.create(input)` consumes one input, runs the fallible initializer and returns an ordinary store. Unit input `()` covers definitions without configuration.

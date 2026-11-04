@@ -17,7 +17,8 @@ The policy follows the [Cargo SemVer compatibility guidance](https://doc.rust-la
 | `ValidationOptions` | Non-exhaustive configuration record with readable and mutable public fields. Begin with `Default` and use `with_context`, `with_events`, `with_emitted`, `with_unknown_events` and `with_unknown_emitted`, or assign individual fields. Future switches receive compatible defaults. |
 | `ValidationError` | Non-exhaustive diagnostic record. Public fields remain readable. Application-provided validation errors use `new(stage, reason, schema)`, optionally followed by `named` and `with_issues`. |
 | `ValidationIssue`, `SchemaMetadata` | Non-exhaustive records with their existing constructors and builders. Use `ValidationIssue::new`/`with_path` and `SchemaMetadata::new`/`with_vendor`. |
-| `HistoryStatus`, `TransitionResult` | Non-exhaustive output records. Read public fields or destructure with `..`. Stores and transition queries produce their values; future diagnostic fields do not require downstream struct-literal changes. `HistoryStatus::default` remains available. |
+| `HistoryStatus`, `TransitionResult`, `CommandResult` | Non-exhaustive output records. Read public fields or destructure with `..`. Stores and transition queries produce their values; future diagnostic fields do not require downstream struct-literal changes. `HistoryStatus::default` remains available. |
+| `TransitionOutcome` | Non-exhaustive outcome enum. Match `Applied`, `Unavailable`, `Rejected` and `ValidationFailed`, with a fallback arm for future outcomes. Application rejection reasons remain generic. |
 | Store, transition, selection, schema, persistence, subscription, factory and scope handles | Existing private fields already protect representation choices. Their documented behavior, trait implementations and generic bounds remain public contracts. |
 
 For example, validation options no longer use external struct literals or struct-update syntax:
@@ -57,6 +58,10 @@ These types represent complete application-facing choices or a concrete intercha
 Stateless and store-backed queries share reduction and opt-in validation. They collect effects without executing them, preserve the existing event availability and snapshot identity rules, and clear nested dispatch status at their pure-query boundary. `with_schemas` alone is inert; `with_validation` checks the outer event and final context/emissions without validating initial external context. `Transition` does not extend snapshot history; existing `Store::transition` keeps its configured history behavior. Deterministic outputs require pure application reducers and validators and immutable context values.
 
 This is a native API extension analogous to the reference's standalone transition constructor. It does not add workflow behavior, a runtime or a new command protocol, and it leaves existing `Store` signatures and behavior unchanged.
+
+`TransitionResult::into_commands` returns `Result<CommandResult<C, M>, TransitionResult<C, E, M>>`. The success record contains the existing proposed snapshot, `Vec<Rc<M>>` commands and availability. It reuses emitted values without additional generic bounds. A proposal containing any executable callback is returned intact as the error value; conversion cannot silently omit executable effects. Payload serialization remains application-owned and optional.
+
+`Transition::outcome` classifies the existing result into `Applied`, `Unavailable` or `ValidationFailed`. Validation outcomes retain the original `StoreError` and source; operational callback failures remain `Err`. `outcome_with_guard` also accepts a per-call `FnOnce(&Snapshot<C>, &E) -> Result<(), R>` and reports `Rejected { reason: R }` before validation or reduction. The guard runs once for the outer event, adds no trait bounds to its reason and does not change internal-trigger behavior. Rejected and invalid outcomes expose no effects. Input snapshots remain externally owned, with the same purity and interior-mutation qualifications as ordinary transitions. These structured queries leave existing Store APIs, availability, effects and validation behavior unchanged.
 
 ## Snapshot selection boundary
 

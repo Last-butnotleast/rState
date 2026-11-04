@@ -1,12 +1,16 @@
+mod commands;
 mod config;
 mod evaluate;
 mod logic;
+mod outcome;
 mod reduce;
 mod result;
 mod update;
 
+pub use commands::CommandResult;
 pub use config::StoreConfig;
 pub use logic::Transition;
+pub use outcome::TransitionOutcome;
 pub use result::TransitionResult;
 pub use update::Update;
 
