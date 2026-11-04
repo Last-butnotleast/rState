@@ -259,7 +259,9 @@ For native controls, reset and undo/redo check the proposed context before commi
 
 ## Development
 
-Use the installed stable Rust toolchain with the WASM target. The initial implementation was checked with Rust 1.98.0. The manifest uses Rust edition 2024 and declares Rust 1.85 as its language baseline; the minimum compiler has not been separately tested.
+See [PLAYBOOK.md](PLAYBOOK.md) for the agent workflow, upstream parity method, verification gates, and the previous session's checkpoint.
+
+Use the installed stable Rust toolchain with the WASM target. The implementation was checked with Rust 1.98.0. The manifest uses Rust edition 2024 and declares Rust 1.85 as its language baseline; Rust 1.85.0 was separately checked with all workspace features during this session.
 
 ```sh
 cargo test --locked --workspace --all-features
