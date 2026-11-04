@@ -32,8 +32,8 @@ fn schemas_clone_and_debug_without_value_bounds_or_validation_calls() {
 
     let descriptor_display = format!("{check:?}");
     let set_display = format!("{cloned:?}");
-    assert!(!descriptor_display.is_empty());
-    assert!(!set_display.is_empty());
+    assert_ne!(descriptor_display, "");
+    assert_ne!(set_display, "");
     assert_eq!(
         declared.context().unwrap().metadata(),
         cloned.context().unwrap().metadata()

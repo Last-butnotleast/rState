@@ -86,7 +86,7 @@ fn deleting_every_row_leaves_a_valid_empty_document_and_undo_restores_selection(
     for id in [1, 2, 3] {
         store.send(Event::Delete(id)).unwrap();
     }
-    assert!(store.get_snapshot().context.rows.is_empty());
+    assert_eq!(store.get_snapshot().context.rows.as_slice(), &[]);
     assert!(store.get_snapshot().context.selected_row().is_none());
     store.undo().unwrap();
     assert_eq!(store.get_snapshot().context.selected_row().unwrap().id, 3);
