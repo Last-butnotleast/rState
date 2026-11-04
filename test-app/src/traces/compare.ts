@@ -6,6 +6,13 @@ import { runScenario } from "./run";
 export function compareScenario(scenario: Scenario) {
   const rust = runScenario(scenario, createRust);
   const reference = runScenario(scenario, createReference);
+  return compareTraces(rust, reference);
+}
+
+export function compareTraces(
+  rust: ReturnType<typeof runScenario>,
+  reference: ReturnType<typeof runScenario>,
+) {
   const differences = Array.from(
     { length: Math.max(rust.length, reference.length) },
     (_, index) => index,

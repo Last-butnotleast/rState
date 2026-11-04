@@ -20,3 +20,7 @@ Each scenario has a descriptive `name`, a fixture `scenario`, and ordered `steps
 Parity comparisons retain callback and command ordering, values, identity relationships, emitted events, effects, and structured recoverable errors. Identity is tracked separately from serialized values; equal contents do not imply equal snapshot or context identity.
 
 Native tests under `crates/rstate/tests` cover the same public contracts plus deeper callback-error, cross-store notification, selection, and retained-effect behavior.
+
+`factory.json` uses a separate, intentionally small multi-instance shape. Its `instances` entries name stores and their initialization inputs; every `step` includes a `store` name. The runner creates one shared factory definition, then creates the named stores through that definition. This avoids treating independently configured stores as evidence of factory behavior.
+
+The factory runner supports the same operations above, plus `subscribeSelected` with `field` and `listener`, and `initial` to read the unchanged initial snapshot. Its two stores cover different inputs, isolated direct and selected subscriptions, pure transitions, availability, per-store emissions, initializer snapshot retention, reducer failure, and explicit unsubscription. All observations and emissions carry their store name.

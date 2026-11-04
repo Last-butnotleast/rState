@@ -1,0 +1,33 @@
+{
+  "name": "One factory creates independent input-initialized stores",
+  "instances": [
+    { "name": "left", "input": { "count": 2 } },
+    { "name": "right", "input": { "count": 9 } }
+  ],
+  "steps": [
+    { "store": "left", "op": "subscribe", "listener": "a" },
+    { "store": "right", "op": "subscribe", "listener": "b" },
+    { "store": "left", "op": "subscribeSelected", "field": "count", "listener": "selected-a" },
+    { "store": "right", "op": "subscribeSelected", "field": "total", "listener": "selected-b" },
+    { "store": "left", "op": "can", "event": { "type": "keep" } },
+    { "store": "left", "op": "can", "event": { "type": "inc", "by": 3 } },
+    { "store": "left", "op": "transition", "event": { "type": "inc", "by": 3 } },
+    { "store": "left", "op": "snapshot" },
+    { "store": "right", "op": "snapshot" },
+    { "store": "left", "op": "send", "event": { "type": "inc", "by": 3 } },
+    { "store": "right", "op": "snapshot" },
+    { "store": "right", "op": "send", "event": { "type": "add", "price": 4 } },
+    { "store": "left", "op": "snapshot" },
+    { "store": "right", "op": "snapshot" },
+    { "store": "left", "op": "initial" },
+    { "store": "right", "op": "initial" },
+    { "store": "left", "op": "unsubscribe", "listener": "a" },
+    { "store": "left", "op": "unsubscribe", "listener": "selected-a" },
+    { "store": "left", "op": "send", "event": { "type": "inc", "by": 1 } },
+    { "store": "right", "op": "snapshot" },
+    { "store": "left", "op": "send", "event": { "type": "fail" } },
+    { "store": "right", "op": "send", "event": { "type": "inc", "by": 2 } },
+    { "store": "left", "op": "snapshot" },
+    { "store": "right", "op": "snapshot" }
+  ]
+}

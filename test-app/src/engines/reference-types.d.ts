@@ -11,13 +11,13 @@ declare module "@reference/store" {
     trigger: Record<string, (payload?: Record<string, unknown>) => void>;
     emit: Record<string, (payload?: Record<string, unknown>) => void>;
   };
-  type Handler = (
+  export type Handler = (
     context: Context,
     event: Event,
     enqueue: Queue,
   ) => Context | void;
   type Result = [SourceSnapshot, unknown[]] & { _allowed?: boolean };
-  type SourceStore = {
+  export type SourceStore = {
     send(event: Event): void;
     getSnapshot(): SourceSnapshot;
     getInitialSnapshot(): SourceSnapshot;
@@ -34,4 +34,8 @@ declare module "@reference/store" {
     context: Context;
     on: Record<string, Handler>;
   }): SourceStore;
+  export function createStoreLogic(config: {
+    context: (input: { count: number }) => Context;
+    on: Record<string, Handler>;
+  }): { createStore(input: { count: number }): SourceStore };
 }

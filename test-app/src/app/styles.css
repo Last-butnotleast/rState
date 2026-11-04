@@ -380,6 +380,16 @@ h2 {
   overflow: auto;
   font-size: 11px;
 }
+.factory-workspace {
+  margin-top: 28px;
+}
+.factory-instances {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+}
+.factory-instances .control-panel:last-child {
+  border-right: 0;
+}
 footer {
   display: flex;
   justify-content: space-between;
@@ -416,6 +426,9 @@ footer {
     font-size: 9px;
   }
   .panels {
+    grid-template-columns: 1fr;
+  }
+  .factory-instances {
     grid-template-columns: 1fr;
   }
   .control-panel {

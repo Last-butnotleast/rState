@@ -10,6 +10,7 @@ type Props = {
   onScenario(name: ScenarioName): void;
   onSend(event: Event): void;
   onCompare(): void;
+  children?: ReactNode;
 };
 
 export function LabDisplay({
@@ -20,6 +21,7 @@ export function LabDisplay({
   onScenario,
   onSend,
   onCompare,
+  children,
 }: Props) {
   const comparison = view?.comparison;
   return (
@@ -200,6 +202,7 @@ export function LabDisplay({
           </pre>
         )}
       </section>
+      {children}
       <footer>
         <span>Native Rust core. Real browser execution.</span>
         <span>Synchronous stores · core v0.1</span>
@@ -207,3 +210,4 @@ export function LabDisplay({
     </main>
   );
 }
+import type { ReactNode } from "react";

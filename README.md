@@ -1,6 +1,6 @@
 # rstate
 
-A small synchronous Rust state store with typed events, shared snapshots, pure transitions, subscriptions, effects, emitted events and context selections. The library uses the Rust standard library and `thiserror`; JavaScript, serialization and browser dependencies stay in the separate test adapter.
+A small synchronous Rust state store with typed events, shared snapshots, pure transitions, subscriptions, effects, emitted events, context selections and reusable factories. The library uses the Rust standard library and `thiserror`; JavaScript, serialization and browser dependencies stay in the separate test adapter.
 
 The selected behavior follows [`@xstate/store` 4.3.0 at commit `9b3a88f`](https://github.com/statelyai/xstate/tree/9b3a88fa43f4be5433797acfba18f27c40494bd2/packages/xstate-store). This is a core implementation, not a port of the complete package or its extensions.
 
@@ -57,6 +57,35 @@ Subscriptions do not replay their initial value. Dropping a subscription handle 
 
 Captured strong store or selection handles can form reference cycles in application callbacks. Explicitly unsubscribe when those callbacks are no longer needed.
 
+## Reusing store behavior
+
+`StoreFactory::new(initializer, reducer)` defines reusable behavior. `factory.create(input)` consumes one input, runs the fallible initializer and returns an ordinary store. Unit input `()` covers definitions without configuration.
+
+```rust
+use rstate::{StoreFactory, Update};
+
+enum CounterEvent {
+    Increment,
+}
+
+let counters: StoreFactory<i32, i32, CounterEvent> = StoreFactory::new(
+    |initial_count: i32| Ok(initial_count),
+    |count, event, _| {
+        Ok(match event {
+            CounterEvent::Increment => Update::replace(**count + 1),
+        })
+    },
+);
+
+let first = counters.create(0).unwrap();
+let second = counters.create(10).unwrap();
+first.send(CounterEvent::Increment).unwrap();
+assert_eq!(*first.get_snapshot().context, 1);
+assert_eq!(*second.get_snapshot().context, 10);
+```
+
+Each creation allocates fresh context and snapshot handles with independent subscriptions, emissions and selection caches. An initializer failure returns its `StoreError` before a store is created and leaves the factory reusable. Factories share their initializer and reducer callbacks through `Rc`; captured application state inside those callbacks is intentionally shared. Cloning a factory adds no `Clone` bounds to input, context, event or emitted types, and dropping it does not invalidate stores already created from it.
+
 ## Layout
 
 `crates/rstate/src` composes focused files under five domains: state, transition, effects, observation and store. Native behavior tests live in the separate mirrored `crates/rstate/tests` tree and use a single explicit Cargo integration-test target. No handwritten code comments or inline test modules are used.
@@ -79,4 +108,4 @@ See the test app's README for browser setup, building the WASM adapter and runni
 
 ## Current boundary
 
-The core is intentionally single-threaded and synchronous. General atoms, cross-store reactive dependency graphs, async/source atoms, managed async effects, persistence, reset/undo, validation, inspection, reusable factories and XState actor integration are outside the implementation scope.
+The core is intentionally single-threaded and synchronous. General atoms, cross-store reactive dependency graphs, async/source atoms, managed async effects, persistence, reset/undo, validation, inspection and XState actor integration are outside the implementation scope.

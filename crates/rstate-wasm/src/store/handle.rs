@@ -26,12 +26,7 @@ impl FixtureStore {
             return Err(JsValue::from_str("unknown scenario"));
         }
         let record = Rc::new(move |entry: Value| invoke(&recorder, entry));
-        Ok(Self {
-            store: scenarios::create(scenario, record),
-            identities: Rc::new(RefCell::new(Identities::default())),
-            subscriptions: RefCell::new(HashMap::new()),
-            next_subscription: Cell::new(0),
-        })
+        Ok(Self::from_store(scenarios::create(scenario, record)))
     }
 
     pub fn send(&self, event: &str) -> Result<(), JsValue> {
@@ -124,6 +119,15 @@ impl FixtureStore {
 }
 
 impl FixtureStore {
+    pub(super) fn from_store(store: Fixture) -> Self {
+        Self {
+            store,
+            identities: Rc::new(RefCell::new(Identities::default())),
+            subscriptions: RefCell::new(HashMap::new()),
+            next_subscription: Cell::new(0),
+        }
+    }
+
     fn register(&self, subscription: Subscription) -> u32 {
         let id = self.next_subscription.get() + 1;
         self.next_subscription.set(id);

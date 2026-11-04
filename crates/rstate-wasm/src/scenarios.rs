@@ -1,5 +1,6 @@
 mod context;
 mod counter;
+mod factory;
 mod ordering;
 
 use std::rc::Rc;
@@ -8,6 +9,7 @@ use rstate::{Enqueue, Store, StoreConfig, StoreResult};
 use serde_json::Value;
 
 pub use context::{Context, Event, Message};
+pub use factory::definition as factory;
 
 pub type Recorder = Rc<dyn Fn(Value) -> StoreResult>;
 pub type Fixture = Store<Context, Event, Message>;

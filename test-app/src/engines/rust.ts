@@ -11,6 +11,10 @@ export function createRust(scenario: ScenarioName, record: Recorder): Engine {
   const store = new FixtureStore(scenario, (entry: string) =>
     record(JSON.parse(entry)),
   );
+  return wrapRustStore(store);
+}
+
+export function wrapRustStore(store: FixtureStore): Engine {
   const snapshots = new Map<number, Snapshot>();
   const decode = (serialized: string): Snapshot => {
     const next = JSON.parse(serialized) as Snapshot;
