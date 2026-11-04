@@ -4463,7 +4463,9 @@ name = "rstate-gpui"
 version = "0.1.0"
 dependencies = [
  "gpui",
+ "libc",
  "rstate",
+ "thiserror 2.0.21",
 ]
 
 [[package]]

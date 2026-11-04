@@ -1,7 +1,10 @@
 use std::rc::Rc;
 
 use crate::persistence::PersistenceState;
-use crate::{Persistence, PersistenceError, StoreConfig, StoreError, StoreFactory, StoreResult};
+use crate::{
+    Persistence, PersistenceError, PersistenceStatus, StoreConfig, StoreError, StoreFactory,
+    StoreResult, Subscription,
+};
 
 use super::Store;
 
@@ -29,6 +32,17 @@ impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
             .persistence
             .as_ref()
             .and_then(|state| state.error())
+    }
+
+    pub fn persistence_status(&self) -> Option<Rc<PersistenceStatus>> {
+        self.inner.persistence.as_ref().map(|state| state.status())
+    }
+
+    pub fn subscribe_persistence(
+        &self,
+        listener: impl Fn(Rc<PersistenceStatus>) + 'static,
+    ) -> StoreResult<Subscription> {
+        Ok(self.persistence()?.subscribe(listener))
     }
 
     fn persistence(&self) -> StoreResult<&PersistenceState<C>> {

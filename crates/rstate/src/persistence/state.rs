@@ -4,9 +4,12 @@ use std::{
     rc::Rc,
 };
 
-use crate::{StoreError, StoreResult};
+use crate::{StoreError, StoreResult, Subscription};
 
-use super::{Persistence, PersistenceError, PersistenceOperation};
+use super::{
+    Persistence, PersistenceActivity, PersistenceError, PersistenceOperation, PersistenceOutcome,
+    PersistenceStatus, status::StatusState,
+};
 
 mod write;
 
@@ -25,6 +28,7 @@ pub struct PersistenceState<C> {
     io_active: Cell<bool>,
     pending: RefCell<Option<Save<C>>>,
     error: RefCell<Option<Rc<PersistenceError>>>,
+    status: StatusState,
 }
 
 impl<C> fmt::Debug for PersistenceState<C> {
@@ -49,6 +53,7 @@ impl<C> PersistenceState<C> {
             io_active: Cell::new(false),
             pending: RefCell::new(None),
             error: RefCell::new(None),
+            status: StatusState::default(),
         }
     }
 
@@ -62,6 +67,17 @@ impl<C> PersistenceState<C> {
 
     pub(crate) fn error(&self) -> Option<Rc<PersistenceError>> {
         self.error.borrow().clone()
+    }
+
+    pub(crate) fn status(&self) -> Rc<PersistenceStatus> {
+        self.status.get()
+    }
+
+    pub(crate) fn subscribe(
+        &self,
+        listener: impl Fn(Rc<PersistenceStatus>) + 'static,
+    ) -> Subscription {
+        self.status.subscribe(listener)
     }
 
     pub(crate) fn load(&self) -> StoreResult<Option<Rc<C>>> {
@@ -91,21 +107,60 @@ impl<C> PersistenceState<C> {
         StoreError::from_error(PersistenceError::operation(operation, error))
     }
 
-    fn report(&self, result: &Result<bool, PersistenceError>) {
+    fn report(&self, result: &Result<bool, PersistenceError>, automatic: bool) {
         match result {
             Ok(false) => {}
             Ok(true) => {
                 let previous = self.error.take();
+                if automatic {
+                    drop(self.record_status(
+                        PersistenceActivity::AutomaticSave,
+                        PersistenceOutcome::Succeeded,
+                    ));
+                }
                 drop(previous);
             }
             Err(error) => {
                 let error = Rc::new(error.clone());
                 let previous = self.error.replace(Some(error.clone()));
+                if automatic {
+                    drop(self.record_status(
+                        PersistenceActivity::AutomaticSave,
+                        PersistenceOutcome::Failed(error.clone()),
+                    ));
+                }
                 drop(previous);
                 if let Some(listener) = &self.config.on_error {
                     listener(&error);
                 }
             }
+        }
+    }
+
+    fn record_status(
+        &self,
+        activity: PersistenceActivity,
+        outcome: PersistenceOutcome,
+    ) -> Rc<PersistenceStatus> {
+        self.status.record(activity, outcome, self.error())
+    }
+
+    fn complete_status(
+        &self,
+        activity: PersistenceActivity,
+        result: &Result<(), PersistenceError>,
+    ) -> Rc<PersistenceStatus> {
+        let outcome = match result {
+            Ok(()) => PersistenceOutcome::Succeeded,
+            Err(PersistenceError::Superseded) => PersistenceOutcome::Superseded,
+            Err(error) => PersistenceOutcome::Failed(Rc::new(error.clone())),
+        };
+        self.record_status(activity, outcome)
+    }
+
+    fn publish_status(&self) {
+        if !self.busy.get() && !self.io_active.get() {
+            self.status.publish();
         }
     }
 }

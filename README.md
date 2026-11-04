@@ -228,6 +228,20 @@ Committed domain events and controls automatically save after successful subscri
 
 Automatic-save failures leave committed state intact, report through `Persistence::on_error` and `store.persistence_error()`, and do not turn the domain action into a storage error. `store.save()` explicitly retries the current context; `store.clear_storage()` removes saved data without resetting live state or history. Explicit operations return typed errors, including a busy error if called reentrantly from active storage I/O. A successful write clears the last reported persistence error. `save()` propagates a queued write failure and returns `PersistenceError::Superseded` if reentrant changes leave the current revision unpersisted.
 
+`store.persistence_status()` returns the current shared `PersistenceStatus`, or `None` when persistence is not configured. `subscribe_persistence(callback)` observes it through an infallible callback and returns `StoreResult<Subscription>`; use `.scoped()` for lifetime cleanup. Registration does not replay the initial status. Status observation adds no snapshot publication, context bounds, serialization requirement or async runtime.
+
+```rust
+let guard = store.subscribe_persistence(|status| {
+    println!("{:?}: {:?}", status.last_activity(), status.outcome());
+}).unwrap().scoped();
+```
+
+The initial status has sequence zero and no activity, outcome or error, including after successful hydration. `last_activity()` identifies `AutomaticSave`, explicit `Save` or `Clear`. `outcome()` is `Succeeded`, `Superseded` or `Failed` with a shared typed persistence error. `error()` captures the `persistence_error()` storage-error state when that status is recorded, which is distinct from the last operation's outcome. During an in-flight explicit operation, its legacy error callback can still read the previous status; `persistence_error()` provides the live storage-error channel at that point. For example, a superseded or rejected reentrant save can have no storage error, and a successful clear does not mean current context was saved. These fields do not provide a Saved, Clean or Dirty claim.
+
+Explicit save and clear statuses describe the result returned by that call, including queued failures and supersession. Automatic encoding/storage failures and successful writes produce status updates; stale or already-scheduled automatic requests skipped without a reported failure or successful write do not. A dispatch whose subscriber or inspector fails before autosave leaves the previous persistence observation intact. The status is a latest observation, rather than an operation log; sequence numbers count recorded outcomes and can jump when nested activity coalesces.
+
+Status callbacks run synchronously after the outer persistence operation releases its busy and I/O guards, before autosave returns to domain effects. A callback can retry a failed save or dispatch another event. Nested status delivery skips a currently running listener and reconciles later listeners to the latest status. Legacy `on_error` callbacks keep their original timing and error behavior. Status listeners have their own infallible notification registry so they cannot consume unrelated domain subscriber errors. Explicit unsubscribe and scoped cleanup release callback captures outside interior borrows; retaining an ordinary subscription handle does not own the store.
+
 ## Schemas and validation
 
 `StoreConfig::with_schemas` and `StoreFactory::with_schemas` attach typed `Schemas<Context, Event, Emitted>` metadata. Each optional context, event or emitted `Schema<T>` has a `SchemaMetadata` name and vendor and a synchronous check callback. `store.schemas()` exposes the configured schemas. Attaching schemas is inert: ordinary `Store::new`, factory `create`, and persisted constructors do not run schema checks.
@@ -268,7 +282,7 @@ For native controls, reset and undo/redo check the proposed context before commi
 
 `conformance` owns shared scenario fixtures and their compatibility contract.
 
-`desktop/rstate-gpui` connects selections to GPUI views with scoped bindings and deferred, shared view notifications. Its separate desktop workspace keeps GPUI's platform dependencies and toolchain requirements out of the core and WASM workspace. See the [adapter guide](desktop/rstate-gpui/README.md) for the pinned engine, document example and desktop checks, and [GPUI_ADAPTER.md](GPUI_ADAPTER.md) for the staged design.
+`desktop/rstate-gpui` connects selections and persistence feedback to GPUI views with scoped bindings and deferred, shared notifications. Command scopes own foreground or background work with explicit concurrency, serialization, replacement and lifetime policies. Its separate desktop workspace keeps GPUI's platform dependencies and toolchain requirements out of the core and WASM workspace. See the [adapter guide](desktop/rstate-gpui/README.md) for the pinned engine, reusable APIs and desktop checks, and [GPUI_ADAPTER.md](GPUI_ADAPTER.md) for the integration design.
 
 ## Development
 

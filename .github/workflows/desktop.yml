@@ -35,3 +35,5 @@ jobs:
         run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
       - name: Test desktop integration and build the example
         run: cargo test --locked --workspace --all-targets --all-features
+      - name: Check a fresh downstream consumer
+        run: python3 scripts/check-consumer.py

@@ -18,7 +18,8 @@ pub use observation::{Inspection, ScopedSubscription, Selection, Subscription};
 #[cfg(feature = "json")]
 pub use persistence::JsonCodec;
 pub use persistence::{
-    Persisted, Persistence, PersistenceError, PersistenceOperation, SnapshotCodec, SnapshotStorage,
+    Persisted, Persistence, PersistenceActivity, PersistenceError, PersistenceOperation,
+    PersistenceOutcome, PersistenceStatus, SnapshotCodec, SnapshotStorage,
 };
 pub use schema::{Schema, SchemaCheck, SchemaMetadata, Schemas};
 pub use state::Snapshot;

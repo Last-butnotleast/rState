@@ -128,6 +128,21 @@ impl FixtureStore {
         ))
     }
 
+    pub fn subscribe_persistence(
+        &self,
+        callback: Function,
+        diagnostics: Function,
+    ) -> Result<u32, JsValue> {
+        let id = self.next_id()?;
+        let subscription = self
+            .store
+            .subscribe_persistence(move |status| {
+                super::controls::status::notify(&status, &callback, &diagnostics);
+            })
+            .map_err(|failure| error(&failure))?;
+        Ok(self.register(id, subscription))
+    }
+
     pub fn unsubscribe(&self, id: u32) {
         let subscription = self.subscriptions.borrow_mut().remove(&id);
         if let Some(subscription) = subscription {

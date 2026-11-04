@@ -10,7 +10,7 @@ mod registration;
 pub use registration::Registration;
 
 pub struct ViewBindings<V> {
-    target: Rc<NotificationTarget<V>>,
+    pub(crate) target: Rc<NotificationTarget<V>>,
 }
 
 impl<V> Clone for ViewBindings<V> {

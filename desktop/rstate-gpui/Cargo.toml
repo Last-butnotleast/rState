@@ -1,5 +1,6 @@
 [package]
 name = "rstate-gpui"
+workspace = ".."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -11,6 +12,10 @@ publish = false
 [dependencies]
 gpui.workspace = true
 rstate.workspace = true
+thiserror.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "=0.2.189"
 
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }

@@ -1,0 +1,20 @@
+[package]
+name = "rstate-gpui-consumer-check"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.98"
+publish = false
+
+[workspace]
+resolver = "3"
+
+[dependencies]
+gpui = "=0.2.2"
+rstate = { path = "../../../crates/rstate", features = ["json"] }
+rstate-gpui = { path = "../../rstate-gpui" }
+
+[profile.dev]
+debug = 0
+
+[lints.rust]
+unsafe_code = "forbid"

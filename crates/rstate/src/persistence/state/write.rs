@@ -2,7 +2,9 @@ use std::rc::Rc;
 
 use crate::{StoreError, StoreResult};
 
-use super::{Flag, PersistenceError, PersistenceOperation, PersistenceState, Save};
+use super::{
+    Flag, PersistenceActivity, PersistenceError, PersistenceOperation, PersistenceState, Save,
+};
 
 impl<C> PersistenceState<C> {
     pub(crate) fn autosave(&self, context: &Rc<C>, revision: u64, epoch: u64) {
@@ -20,52 +22,82 @@ impl<C> PersistenceState<C> {
             drop(previous);
             return;
         }
-        let _busy = Flag::enter(&self.busy);
+        let busy = Flag::enter(&self.busy);
         let result = self.write(&request);
-        self.report(&result);
-        drop(self.drain());
+        self.report(&result, true);
+        let drained = self.drain();
+        drop(busy);
+        drop(drained);
+        drop(result);
+        self.publish_status();
     }
 
     pub(crate) fn save(&self, context: Rc<C>) -> StoreResult<()> {
         if self.busy.get() {
-            return Err(StoreError::from_error(PersistenceError::Reentrant {
-                operation: PersistenceOperation::Save,
-            }));
+            return self.reject(PersistenceActivity::Save, PersistenceOperation::Save);
         }
         let request = Save {
             context,
             revision: self.revision.get(),
             epoch: self.epoch.get(),
         };
+        let busy = Flag::enter(&self.busy);
+        let (result, retired) = self.save_current(&request);
+        let previous = self.complete_status(PersistenceActivity::Save, &result);
+        drop(busy);
+        drop(previous);
+        drop(retired);
+        drop(request);
+        self.publish_status();
+        result.map_err(StoreError::from_error)
+    }
+
+    fn save_current(
+        &self,
+        request: &Save<C>,
+    ) -> (Result<(), PersistenceError>, Option<PersistenceError>) {
         self.scheduled.set(Some(request.revision));
-        let _busy = Flag::enter(&self.busy);
-        let result = self.write(&request);
-        self.report(&result);
+        let result = self.write(request);
+        self.report(&result, false);
         let drained = self.drain();
-        let wrote = result.map_err(StoreError::from_error)?;
-        let saved = drained
-            .map_err(StoreError::from_error)?
-            .or_else(|| wrote.then_some((request.revision, request.epoch)));
-        if saved == Some((self.revision.get(), self.epoch.get())) {
+        let wrote = match result {
+            Ok(wrote) => wrote,
+            Err(error) => return (Err(error), drained.err()),
+        };
+        let saved = match drained {
+            Ok(saved) => saved.or_else(|| wrote.then_some((request.revision, request.epoch))),
+            Err(error) => return (Err(error), None),
+        };
+        let outcome = if saved == Some((self.revision.get(), self.epoch.get())) {
             Ok(())
         } else {
-            Err(StoreError::from_error(PersistenceError::Superseded))
-        }
+            Err(PersistenceError::Superseded)
+        };
+        (outcome, None)
     }
 
     pub(crate) fn clear(&self) -> StoreResult<()> {
         if self.io_active.get() {
-            return Err(StoreError::from_error(PersistenceError::Reentrant {
-                operation: PersistenceOperation::Clear,
-            }));
+            return self.reject(PersistenceActivity::Clear, PersistenceOperation::Clear);
         }
         let owner = !self.busy.get();
-        let _busy = owner.then(|| Flag::enter(&self.busy));
-        let epoch = self
-            .epoch
-            .get()
-            .checked_add(1)
-            .ok_or_else(|| StoreError::from_error(PersistenceError::EpochExhausted))?;
+        let busy = owner.then(|| Flag::enter(&self.busy));
+        let (result, retired) = self.clear_current(owner);
+        let previous = self.complete_status(PersistenceActivity::Clear, &result);
+        drop(busy);
+        drop(previous);
+        drop(retired);
+        self.publish_status();
+        result.map_err(StoreError::from_error)
+    }
+
+    fn clear_current(
+        &self,
+        owner: bool,
+    ) -> (Result<(), PersistenceError>, Option<PersistenceError>) {
+        let Some(epoch) = self.epoch.get().checked_add(1) else {
+            return (Err(PersistenceError::EpochExhausted), None);
+        };
         self.epoch.set(epoch);
         self.scheduled.set(None);
         let pending = self.pending.take();
@@ -78,11 +110,20 @@ impl<C> PersistenceState<C> {
                 .map(|()| true)
                 .map_err(|error| PersistenceError::operation(PersistenceOperation::Clear, error))
         };
-        self.report(&result);
-        if owner {
-            drop(self.drain());
-        }
-        result.map(|_| ()).map_err(StoreError::from_error)
+        self.report(&result, false);
+        let retired = owner.then(|| self.drain().err()).flatten();
+        (result.map(|_| ()), retired)
+    }
+
+    fn reject(
+        &self,
+        activity: PersistenceActivity,
+        operation: PersistenceOperation,
+    ) -> StoreResult<()> {
+        let result = Err(PersistenceError::Reentrant { operation });
+        drop(self.complete_status(activity, &result));
+        self.publish_status();
+        result.map_err(StoreError::from_error)
     }
 
     fn current(&self, request: &Save<C>) -> bool {
@@ -117,7 +158,7 @@ impl<C> PersistenceState<C> {
                 break;
             };
             let result = self.write(&request);
-            self.report(&result);
+            self.report(&result, true);
             match result {
                 Ok(true) => saved = Some((request.revision, request.epoch)),
                 Ok(false) => {}

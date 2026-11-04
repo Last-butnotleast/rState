@@ -132,6 +132,10 @@ impl FixtureControls {
             .persistence_error()
             .map(|failure| original_message(failure.as_ref()))
     }
+
+    pub fn persistence_status(&self) -> String {
+        super::status::read(&self.store)
+    }
 }
 
 fn counter() -> String {

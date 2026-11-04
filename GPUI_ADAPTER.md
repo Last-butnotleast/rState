@@ -1,6 +1,6 @@
 # rState GPUI adapter package design
 
-Status: foundation implementation in `desktop/rstate-gpui`, using the published Zed `gpui` package pinned to `0.2.2`. Snapshot selections, selection bindings, deferred notification targets, dispatch error routing and the document example are implemented. Desktop operations and optional tooling remain later stages. The [adapter guide](desktop/rstate-gpui/README.md) records the concrete API and verification commands; future-stage sketches below remain design proposals.
+Status: reusable integration in `desktop/rstate-gpui`, using the published Zed `gpui` package pinned to `0.2.2`. The library includes snapshot selections, scoped view bindings, deferred notifications, dispatch error routing, command scopes and persistence feedback. Downstream dependency constraints are checked in a standalone consumer with its own lockfile. The existing document example remains a foundation fixture. The [adapter guide](desktop/rstate-gpui/README.md) records the concrete APIs and verification commands; optional tooling below remains a design proposal.
 
 `rstate-gpui` connects rState's typed application state to GPUI views. rState owns domain data and synchronous transitions; GPUI owns rendering, widgets and presentation state. The adapter translates selected-state changes into deferred view notifications, manages observation lifetimes and provides a consistent place for desktop integration utilities.
 
@@ -28,7 +28,7 @@ The existing behavior and native boundaries are documented in [README.md](README
 
 GPUI and similarly named toolkits use different package distributions. The first implementation must select and lock one engine together with the intended toolkit and platform dependencies.
 
-The foundation selects Zed's published `gpui = "=0.2.2"` directly, without a widget toolkit. Its platform implementation is included in that distribution. The separate `desktop` workspace and lockfile keep these dependencies out of the core and WASM workspace. The other distributions below are reference alternatives, not supported interchangeable engines.
+The adapter selects Zed's published `gpui = "=0.2.2"` directly, without a widget toolkit. Its platform implementation is included in that distribution. The separate `desktop` workspace keeps these dependencies out of the core and WASM workspace. A Linux manifest constraint selects the compatible `libc = "=0.2.189"` for GPUI's older `xattr` dependency; the constraint also applies to downstream resolution. A standalone consumer generates its own lockfile and verifies a single shared GPUI package identity. The other distributions below are reference alternatives, not supported interchangeable engines.
 
 | Integration target | Inspected dependency relationship |
 | --- | --- |
@@ -160,15 +160,17 @@ Implement these only where the example demonstrates repeated boilerplate. Equiva
 
 Persistence bookkeeping currently lives outside snapshots. `persistence_error()` exposes the last failure, and successful operations can clear it without publishing a new domain snapshot. `select_snapshot` therefore does not solve persistence feedback by itself.
 
-Add a separate, framework-independent status read and subscription interface when implementing persistence bindings. Its minimum contract must notify when a failure appears or is replaced, when recovery clears the error and when relevant explicit save or clear outcomes change. Notifications use the same safe callback and cleanup principles as other observations.
+`Store::persistence_status()` returns the latest optional shared `PersistenceStatus`. `subscribe_persistence` registers an infallible callback without replay and returns the ordinary subscription type, including opt-in scoped cleanup. The opaque status exposes a monotonic sequence, the last activity, its typed outcome and the storage error as of that recorded observation. It reports failure, replacement, recovery and explicit save or clear outcomes. `ViewBindings::bind_persistence` observes this interface through the same deferred notification target as selection bindings.
 
-Define operation outcomes before naming status fields. Clearing storage can clear an error without saving current context. A successful write may be superseded by nested changes, and a prior delivery error may have skipped autosave. An absent error is not sufficient evidence for a `Saved` or `Clean` label. Revision-based saved/dirty claims require a separate precise contract and tests.
+Status is the latest observation rather than an operation log. Nested activity can coalesce, so sequences may jump. Direct reads reflect recorded activity immediately; feedback callbacks run after the outermost persistence operation releases its busy and I/O guards. They can retry or dispatch synchronously. A private infallible notification registry preserves cleanup and nested-delivery rules without draining the core's separate fallible domain-notification queue.
+
+Explicit operation outcomes describe the final returned result, including queued failures and superseded saves. The storage error is separate from the latest activity outcome. `persistence_error()` remains the live error read; during an in-flight explicit operation, its legacy error callback can see an updated live error while status still describes a prior recorded outcome. Clearing storage can clear an error without saving current context. A successful write may be superseded by nested changes, and a prior delivery error may have skipped autosave. An absent error is not sufficient evidence for a `Saved` or `Clean` label. Revision-based saved/dirty claims require a separate precise contract and tests.
 
 Status observation must preserve snapshot identity and existing persistence ordering. It must report reentrant changes coherently without making feedback callbacks another storage-error source. This work adds no async storage, migration, throttling or partial-context persistence to the core.
 
 ## GPUI task and command bridge
 
-The second implementation stage adds reusable desktop task handling. The core remains synchronous: an event commits state, an effect or emitted command submits work, and a typed completion event publishes its result later.
+The desktop operations stage adds reusable task handling through an application-owned `CommandScope`. Its channels identify independent operation lanes with `Concurrent`, `Serial` or `Latest` policies. Applications choose whether a scope belongs to an application manager, another capability owner or a view. The core remains synchronous: an event commits state, an effect or emitted command submits work, and a typed completion event publishes its result later.
 
 ```text
 LoadRequested → Loading state → GPUI task
@@ -179,9 +181,11 @@ GPUI provides foreground and background executors. Owned request and result data
 
 An effect submits work and returns `Ok(())`. Submissions from synchronous store callbacks enter a FIFO command queue; a foreground job enters GPUI and starts the work after the callback stack unwinds. Command submission order is preserved, while concurrently running tasks may complete out of order. The application runner owns task handles, awaits completion through GPUI and routes outcomes back to the appropriate manager. Never block the UI thread with `block_on` or move a whole store into background work. Avoid retaining an owning `EffectScope` merely to dispatch a later result; weak store access or the document manager gives the lifetime an explicit policy.
 
-Task lifetime must match the operation. A document load should ordinarily belong to the document manager, so closing one of several views does not cancel it. A view-specific search preview may end with that view. Closing the document or application cancels its relevant tasks and disables late delivery.
+Task lifetime must match the operation. Shared capability work belongs to its manager, so closing one consuming view does not cancel it. A view-specific search preview may end with that view. Closing the owning scope cancels its handles and disables late delivery. Submission channels and tickets hold weak scope references; they do not extend the owner's lifetime.
 
-Cancellation alone is insufficient because completed or uncancelable work can still return. Associate requests with document identity, an operation key, a monotonic generation and the relevant input. Reject stale completion events after replacement, changed input, reset or closure according to the application's policy. Keep lifetime generations outside undoable snapshot history so Undo cannot accidentally revive an old request.
+Cancellation alone is insufficient because completed or uncancelable work can still return. Channel identity identifies the operation lane, and monotonic request identities belong to the scope outside undoable snapshot history. Applications explicitly invalidate a channel or scope when input changes, state resets or their lifetime policy requires it. Replacement and invalidation reject stale delivery; Undo cannot revive an old request identity.
+
+Serial channels preserve ordering by allowing already-started canceled work to finish before starting the next request; cancellation immediately suppresses its delivery. Pending requests can be removed immediately. Scope closure drops owned task handles. Cancellation does not promise rollback or interruption of operating-system work already running, and ordering applies within the chosen scope and channel.
 
 Preserve every command that requires processing. Redraw coalescing must never silently discard emitted commands. Expected operation failures become typed domain outcomes; errors while dispatching those outcomes follow the dispatch error contract. A closed target is handled according to the task's documented cancellation policy.
 
@@ -229,9 +233,9 @@ Keep `Clone`, `Debug`, serialization and thread-safety bounds local to operation
 | Desktop operations | Task bridge, persistence status observation and corresponding bindings | Background work, cancellation, stale results and save failure recovery have explicit tested behavior |
 | Optional tooling | Transition inspector and demonstrated ergonomic helpers | Each addition has a concrete example and bounded ownership behavior |
 
-The example should grow through these stages. Start with two windows sharing a list/detail document store, rename/delete operations and reset/Undo/Redo controls. Add background document loading and a storage adapter capable of deliberate failure and recovery in the second stage. Also open an independent document created by the same factory to verify separation of state and lifetimes.
+Reusable library features are verified through focused generic fixtures: an independent consumer workspace, deterministic GPUI command and binding tests, core persistence tests and native-policy WASM tests. The existing document example remains a foundation regression fixture. Application-specific managers, file workflows and UI expansion are outside this implementation scope.
 
-Use the example's domain behavior in headless native tests. Continue exercising the actual rState core through the existing WASM adapter where core contracts change. The GPUI layer requires its own native integration evidence; the JavaScript reference is not an oracle for desktop rendering.
+Continue exercising the actual rState core through the existing WASM adapter where core contracts change. The GPUI layer requires its own native integration evidence; the JavaScript reference is not an oracle for desktop rendering.
 
 ## Acceptance tests and verification
 
