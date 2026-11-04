@@ -1,0 +1,12 @@
+{
+  "name": "Nested effect dispatch retains the outer effect snapshot",
+  "scenario": "ordering",
+  "steps": [
+    { "op": "subscribe", "listener": "a" },
+    { "op": "send", "event": { "type": "start" } },
+    { "op": "snapshot" },
+    { "op": "unsubscribe", "listener": "a" },
+    { "op": "send", "event": { "type": "bump", "by": 2 } },
+    { "op": "snapshot" }
+  ]
+}

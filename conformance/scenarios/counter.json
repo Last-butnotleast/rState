@@ -1,0 +1,20 @@
+{
+  "name": "Counter values, identity and availability",
+  "scenario": "counter",
+  "steps": [
+    { "op": "subscribe", "listener": "a" },
+    { "op": "can", "event": { "type": "keep" } },
+    { "op": "can", "event": { "type": "same" } },
+    { "op": "can", "event": { "type": "inc", "by": 1 } },
+    { "op": "transition", "event": { "type": "inc", "by": 2 } },
+    { "op": "snapshot" },
+    { "op": "send", "event": { "type": "inc", "by": 1 } },
+    { "op": "send", "event": { "type": "keep" } },
+    { "op": "send", "event": { "type": "same" } },
+    { "op": "send", "event": { "type": "equal" } },
+    { "op": "snapshot" },
+    { "op": "unsubscribe", "listener": "a" },
+    { "op": "send", "event": { "type": "inc", "by": 5 } },
+    { "op": "snapshot" }
+  ]
+}

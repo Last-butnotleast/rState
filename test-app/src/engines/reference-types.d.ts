@@ -1,0 +1,37 @@
+declare module "@reference/store" {
+  type Context = { count: number; items: number[]; total: number };
+  type Event = { type: string; by?: number; price?: number };
+  type Message = { type: string; total?: number };
+
+  type SourceSnapshot = { context: Context };
+  type Subscription = { unsubscribe(): void };
+  type Scope = { send(event: Event): void; getSnapshot(): SourceSnapshot };
+  type Queue = {
+    effect(callback: (scope: Scope) => void): void;
+    trigger: Record<string, (payload?: Record<string, unknown>) => void>;
+    emit: Record<string, (payload?: Record<string, unknown>) => void>;
+  };
+  type Handler = (
+    context: Context,
+    event: Event,
+    enqueue: Queue,
+  ) => Context | void;
+  type Result = [SourceSnapshot, unknown[]] & { _allowed?: boolean };
+  type SourceStore = {
+    send(event: Event): void;
+    getSnapshot(): SourceSnapshot;
+    getInitialSnapshot(): SourceSnapshot;
+    transition(snapshot: SourceSnapshot, event: Event): Result;
+    subscribe(callback: (snapshot: SourceSnapshot) => void): Subscription;
+    select(
+      selector: (context: Context) => number,
+      compare: (left: number, right: number) => boolean,
+    ): { subscribe(callback: (value: number) => void): Subscription };
+    on(type: string, callback: (message: Message) => void): Subscription;
+    can: Record<string, (payload?: Record<string, unknown>) => boolean>;
+  };
+  export function createStore(config: {
+    context: Context;
+    on: Record<string, Handler>;
+  }): SourceStore;
+}

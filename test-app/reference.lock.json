@@ -1,0 +1,43 @@
+{
+  "repository": "https://github.com/statelyai/xstate",
+  "commit": "9b3a88fa43f4be5433797acfba18f27c40494bd2",
+  "version": "4.3.0",
+  "license": "MIT",
+  "files": [
+    {
+      "source": "packages/xstate-store/src/store.ts",
+      "target": "src/store.ts",
+      "sha256": "2e07af02266533efd10811cd0fd5a347baf07a34aa238cd557fd62b65790595b"
+    },
+    {
+      "source": "packages/xstate-store/src/atom.ts",
+      "target": "src/atom.ts",
+      "sha256": "bc00a136dfda51bd5ca9818f327a4afdb849553d0d76f4ab7c2b523e4a5d2450"
+    },
+    {
+      "source": "packages/xstate-store/src/alien.ts",
+      "target": "src/alien.ts",
+      "sha256": "04ab777b5bea850336488fe3246ff7c651ac98bffb543c32a341fab8e50da20d"
+    },
+    {
+      "source": "packages/xstate-store/src/types.ts",
+      "target": "src/types.ts",
+      "sha256": "344d861a2c12838e02eec0d2195d85754d10ed0d8a3b13a68aa557235ada0dce"
+    },
+    {
+      "source": "packages/xstate-store/src/schema.ts",
+      "target": "src/schema.ts",
+      "sha256": "6f6cd88224f9a4686a64dd21d73eddb412aa0a3c024a886e415d0de595e977fe"
+    },
+    {
+      "source": "packages/xstate-store/src/validationError.ts",
+      "target": "src/validationError.ts",
+      "sha256": "719c160319a53eefee6ea484b16207c6379b8d16e6fcd7824ca304da5c520a54"
+    },
+    {
+      "source": "LICENSE",
+      "target": "LICENSE",
+      "sha256": "542d926d7bbb099785e322d1d5574c539d51942e52ec8adce2be4629ba81fc7f"
+    }
+  ]
+}

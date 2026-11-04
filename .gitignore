@@ -1,0 +1,7 @@
+/target/
+/test-app/node_modules/
+/test-app/dist/
+/test-app/.reference/
+/test-app/playwright-report/
+/test-app/test-results/
+/test-app/src/generated/

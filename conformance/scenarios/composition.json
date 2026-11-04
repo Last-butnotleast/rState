@@ -1,0 +1,11 @@
+{
+  "name": "Composed cart update publishes one final result",
+  "scenario": "composition",
+  "steps": [
+    { "op": "subscribe", "listener": "cart" },
+    { "op": "send", "event": { "type": "add", "price": 8 } },
+    { "op": "send", "event": { "type": "add", "price": 12 } },
+    { "op": "snapshot" },
+    { "op": "unsubscribe", "listener": "cart" }
+  ]
+}
