@@ -26,5 +26,7 @@ jobs:
         run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
       - name: Check WebAssembly lints
         run: cargo clippy --locked -p rstate-wasm --target wasm32-unknown-unknown --all-features -- -D warnings
+      - name: Check the minimal core for WebAssembly
+        run: cargo check --locked -p rstate --no-default-features --target wasm32-unknown-unknown
       - name: Test the workspace
         run: cargo test --locked --workspace --all-features

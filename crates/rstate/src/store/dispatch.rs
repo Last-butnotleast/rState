@@ -1,8 +1,7 @@
 use std::rc::Rc;
 
 use crate::{
-    DispatchStatus, Effect, Snapshot, StoreError, StoreResult, TransitionResult, ValidationStage,
-    transition::reduce,
+    DispatchStatus, Snapshot, StoreError, StoreResult, TransitionResult, transition::evaluate,
 };
 
 use super::{Store, commit::Action};
@@ -44,22 +43,13 @@ impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
         snapshot: &Rc<Snapshot<C>>,
         event: &E,
     ) -> StoreResult<TransitionResult<C, E, M>> {
-        if let Some(options) = self.inner.validation {
-            options.check_event(self.inner.schemas.events(), event)?;
-        }
-        let mut result = reduce(self.inner.reducer.as_ref(), snapshot.clone(), event)?;
-        if let Some(options) = self.inner.validation {
-            options.check_context(
-                self.inner.schemas.context(),
-                &result.snapshot.context,
-                ValidationStage::Context,
-            )?;
-            for effect in &result.effects {
-                if let Effect::Emit(message) = effect {
-                    options.check_emitted(self.inner.schemas.emitted(), message.as_ref())?;
-                }
-            }
-        }
+        let mut result = evaluate(
+            self.inner.reducer.as_ref(),
+            snapshot,
+            event,
+            &self.inner.schemas,
+            self.inner.validation,
+        )?;
         if self.inner.history_limit.is_some() {
             result.snapshot =
                 Rc::new(snapshot.record(result.snapshot.context.clone(), self.inner.history_limit));

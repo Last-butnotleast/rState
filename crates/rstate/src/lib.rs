@@ -24,7 +24,7 @@ pub use persistence::{
 pub use schema::{Schema, SchemaCheck, SchemaMetadata, Schemas};
 pub use state::Snapshot;
 pub use store::{Store, StoreFactory, WeakStore};
-pub use transition::{StoreConfig, TransitionResult, Update};
+pub use transition::{StoreConfig, Transition, TransitionResult, Update};
 pub use validation::{
     PathSegment, UnknownPolicy, ValidationError, ValidationIssue, ValidationOptions,
     ValidationReason, ValidationStage,

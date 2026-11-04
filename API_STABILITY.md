@@ -18,7 +18,7 @@ The policy follows the [Cargo SemVer compatibility guidance](https://doc.rust-la
 | `ValidationError` | Non-exhaustive diagnostic record. Public fields remain readable. Application-provided validation errors use `new(stage, reason, schema)`, optionally followed by `named` and `with_issues`. |
 | `ValidationIssue`, `SchemaMetadata` | Non-exhaustive records with their existing constructors and builders. Use `ValidationIssue::new`/`with_path` and `SchemaMetadata::new`/`with_vendor`. |
 | `HistoryStatus`, `TransitionResult` | Non-exhaustive output records. Read public fields or destructure with `..`. Stores and transition queries produce their values; future diagnostic fields do not require downstream struct-literal changes. `HistoryStatus::default` remains available. |
-| Store, selection, schema, persistence, subscription, factory and scope handles | Existing private fields already protect representation choices. Their documented behavior, trait implementations and generic bounds remain public contracts. |
+| Store, transition, selection, schema, persistence, subscription, factory and scope handles | Existing private fields already protect representation choices. Their documented behavior, trait implementations and generic bounds remain public contracts. |
 
 For example, validation options no longer use external struct literals or struct-update syntax:
 
@@ -49,6 +49,14 @@ This is a deliberate pre-1.0 source change. Replace `StoreError` variant constru
 These types represent complete application-facing choices or a concrete interchange shape. Adding cases or required fields would require downstream decisions, so such changes deserve a major-version review rather than a catch-all pattern today.
 
 `SnapshotStorage` and `SnapshotCodec` remain open traits intended for application implementations. New required methods or changed signatures require a major-version review; compatible new behavior should use defaults or separate optional interfaces.
+
+## Stateless transition boundary
+
+`Transition<C, E, M>` is a cloneable reducer definition created without an initial context or store lifecycle. `transition(&Rc<Snapshot<C>>, E)` returns the existing `StoreResult<TransitionResult<C, E, M>>`. Its opaque representation and `Debug` implementation add no application trait bounds. Reducers and optional schema callbacks are shared across clones; the handle owns no current snapshot, subscribers, persistence or history configuration.
+
+Stateless and store-backed queries share reduction and opt-in validation. They collect effects without executing them, preserve the existing event availability and snapshot identity rules, and clear nested dispatch status at their pure-query boundary. `with_schemas` alone is inert; `with_validation` checks the outer event and final context/emissions without validating initial external context. `Transition` does not extend snapshot history; existing `Store::transition` keeps its configured history behavior. Deterministic outputs require pure application reducers and validators and immutable context values.
+
+This is a native API extension analogous to the reference's standalone transition constructor. It does not add workflow behavior, a runtime or a new command protocol, and it leaves existing `Store` signatures and behavior unchanged.
 
 ## Snapshot selection boundary
 

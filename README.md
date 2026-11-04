@@ -1,6 +1,6 @@
 # rstate
 
-A small synchronous Rust state store with typed events, shared snapshots, pure transitions, subscriptions, effects, emitted events, transition inspection, context selections, reusable factories, reset, snapshot history, synchronous snapshot persistence and opt-in validation. The default library uses the Rust standard library and `thiserror`; the optional `json` feature adds a serialization adapter.
+A small synchronous Rust state store with typed events, shared snapshots, stateless transitions, subscriptions, effects, emitted events, transition inspection, context selections, reusable factories, reset, snapshot history, synchronous snapshot persistence and opt-in validation. The default library uses the Rust standard library and `thiserror`; the optional `json` feature adds a serialization adapter.
 
 The selected behavior follows [`@xstate/store` 4.3.0 at commit `9b3a88f`](https://github.com/statelyai/xstate/tree/9b3a88fa43f4be5433797acfba18f27c40494bd2/packages/xstate-store). This is a core implementation, not a port of the complete package or its extensions.
 
@@ -128,6 +128,35 @@ let _guard = store.subscribe(move |snapshot| {
 ```
 
 Use weak captures when callbacks should not own their store, and scoped guards or explicit unsubscribe when observation ends. Capturing an owning selection or effect scope can still retain the store.
+
+## Externally managed state
+
+`Transition::new(reducer)` defines reusable transition behavior without an initial context or an observable store. Supply an externally owned `Rc<Snapshot<C>>` to each call:
+
+```rust
+use std::rc::Rc;
+use rstate::{Snapshot, Transition, Update};
+
+let transition: Transition<i32, i32> = Transition::new(|count, by, _| {
+    Ok(Update::replace(count.saturating_add(*by)))
+});
+let loaded = Rc::new(Snapshot::new(Rc::new(10)));
+let proposed = transition.transition(&loaded, 2).unwrap();
+
+assert_eq!(*loaded.context, 10);
+assert_eq!(*proposed.snapshot.context, 12);
+assert!(proposed.allowed);
+```
+
+The returned `TransitionResult` has the same proposed snapshot, ordered `effects` and `allowed` fields as `Store::transition`. Both use the same reduction and validation implementation, including FIFO internal triggers, snapshot identity and availability rules. Calls do not publish snapshots, notify listeners, execute queued callbacks or emissions, or initialize persistence. The transition handle has no current snapshot or mutable global state. Cloning it shares reducer and schema callbacks without adding `Clone`, `Debug`, serialization or thread-safety bounds to application types.
+
+Attach typed schema metadata with `with_schemas(schemas)` and opt into checks with `with_validation(ValidationOptions::default())`. Read metadata through `schemas()`. Checks follow the existing store policy: validate the outer event before reduction, then the final context and collected emissions; internally triggered events bypass outer event validation. There is no initialization check for externally supplied context. Errors retain validation details or their application source and carry no dispatch status. Without `with_validation`, metadata remains inert.
+
+`Transition` does not record snapshot history. Keeping a supplied snapshot retains its metadata; replacing its context uses the ordinary reducer snapshot behavior. `Store::transition` continues to simulate its configured history. Keep reducers, schema checks and context values pure and immutable for reproducible results: callbacks can capture application state, and arbitrary interior mutation is outside the snapshot contract.
+
+For a database transaction, load a row into a snapshot, calculate a proposal, check `allowed` and errors, then persist the proposed context and application outputs within that transaction. The database owns commit and rollback. Queued `Effect::Emit` values are inspectable typed data; `Effect::Run` callbacks remain unexecuted and should not be used as durable commands. Native tests exercise this load/evaluate/commit pattern, including aborted proposals. A pinned SpacetimeDB SDK example remains a separate integration step.
+
+The core already supports `default-features = false` without serialization adapters, async runtimes or background threads. CI checks that configuration for `wasm32-unknown-unknown`; this is a core compilation check, with SpacetimeDB SDK compatibility to be verified by its integration example.
 
 ## Reusing store behavior
 
