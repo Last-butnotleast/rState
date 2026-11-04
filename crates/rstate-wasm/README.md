@@ -9,3 +9,5 @@ This private crate connects fixed test scenarios to the actual rstate library. I
 `FixtureSelection` owns a count selection and two explicit `Selection::map` stages. It exposes reads, projector counts and subscriptions for the fixed source → bucket → label fixture. Per-target IDs retain actual Rust value handles, and JavaScript callbacks run after identity-table borrows end. The oracle uses the pinned source's computed atoms for the same chain.
 
 Build and test through `test-app` scripts. Its README contains the verified toolchain and commands. The bridge is not published and is not a general-purpose JavaScript SDK.
+
+`FixtureStore::inspect` forwards real core inspection records with retained snapshot identities. Inspection serializes the typed fixture event rather than retaining arbitrary JavaScript input objects. Inspection scenarios therefore use explicit numeric payloads and the fixture's exact `unknown` event tag; optional-field spelling and arbitrary unknown event names are outside that fixture contract. Inspector callbacks may synchronously register other observers, so subscription identifiers are reserved before callback delivery.

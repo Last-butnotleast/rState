@@ -41,6 +41,8 @@ The original three fixtures cover a counter, cart composition and nested effect 
 
 This is a test bridge for these fixtures, rather than a general JavaScript API for arbitrary Rust stores. Recoverable fixture errors use explicit library errors; Rust panics and WebAssembly traps are outside the compatibility contract. General atoms, async runtimes and extensions are outside the core scope.
 
+`inspection.json` exercises immediate current-state inspection, unchanged outer events, dry-run silence, notification/effect ordering, reentry and unsubscribe. The adapters use real Rust inspection records and the pinned store's `inspect` callback. Snapshot identities are retained; actor/session metadata is outside the native contract. Dedicated browser tests also cover live inspector registration/removal, initial callback failures that leave registration active, and fail-fast transition errors. Inspected fixture events use explicit numeric payloads and the exact `unknown` tag because the Rust bridge exposes a typed event, not arbitrary original JavaScript objects.
+
 ## Layout
 
 Application state and operations live in `src/app/session.ts` and `useLab.ts`; the display receives values and callbacks. The factory and selection panels follow the same arrangement under `src/app/factory` and `src/app/selection`. Engine adapters, scenarios and trace comparison have their own domains. Tests live in a separate tree under `tests`. Generated WASM bindings live in `src/generated` and are ignored.

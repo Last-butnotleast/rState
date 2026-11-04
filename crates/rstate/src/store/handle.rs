@@ -1,7 +1,9 @@
 use std::{cell::RefCell, fmt, rc::Rc};
 
 use crate::{Snapshot, StoreConfig, StoreResult, Subscription};
-use crate::{observation::Emissions, observation::Observers, transition::Reducer};
+use crate::{
+    observation::Emissions, observation::Inspectors, observation::Observers, transition::Reducer,
+};
 
 pub struct Store<C, E, M = ()> {
     pub(crate) inner: Rc<StoreInner<C, E, M>>,
@@ -29,6 +31,7 @@ pub struct StoreInner<C, E, M> {
     pub(crate) current: RefCell<Rc<Snapshot<C>>>,
     pub(crate) reducer: Rc<Reducer<C, E, M>>,
     pub(crate) observers: Observers,
+    pub(crate) inspectors: Inspectors<C, E>,
     pub(crate) emissions: Emissions<M>,
 }
 
@@ -49,6 +52,7 @@ impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
                 current: RefCell::new(snapshot),
                 reducer: config.reducer,
                 observers: Observers::default(),
+                inspectors: Inspectors::default(),
                 emissions: Emissions::default(),
             }),
         }

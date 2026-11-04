@@ -70,6 +70,41 @@ function execute(
     case "unsubscribe":
       listeners.get(step.listener!)?.();
       return;
+    case "inspect": {
+      listeners.get(step.listener!)?.();
+      let nested = false;
+      const unsubscribe = engine.inspect((inspection) => {
+        record({
+          kind: "inspect",
+          listener: step.listener,
+          ...inspection,
+          current: engine.snapshot(),
+        });
+        if (step.fail) throw new Error(step.fail);
+        if (
+          step.send &&
+          !nested &&
+          inspection.snapshot.context.count === step.whenCount
+        ) {
+          nested = true;
+          engine.send(step.send);
+        }
+      });
+      listeners.set(step.listener!, unsubscribe);
+      return;
+    }
+    case "subscribeSelected": {
+      listeners.get(step.listener!)?.();
+      const unsubscribe = engine.subscribeSelected(
+        step.field ?? "count",
+        (value) => {
+          record({ kind: "selected", listener: step.listener, value });
+          if (step.fail) throw new Error(step.fail);
+        },
+      );
+      listeners.set(step.listener!, unsubscribe);
+      return;
+    }
     case "subscribe": {
       listeners.get(step.listener!)?.();
       let nested = false;

@@ -10,7 +10,9 @@ impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
         snapshot: Rc<Snapshot<C>>,
         event: E,
     ) -> StoreResult<TransitionResult<C, E, M>> {
-        reduce(self.inner.reducer.as_ref(), snapshot, event)
+        let result = reduce(self.inner.reducer.as_ref(), snapshot, &event);
+        drop(event);
+        result
     }
 
     pub fn can(&self, event: E) -> StoreResult<bool> {
@@ -20,12 +22,14 @@ impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
 
     pub fn send(&self, event: E) -> StoreResult<()> {
         let previous = self.get_snapshot();
-        let result = self.transition(previous.clone(), event)?;
+        let result = reduce(self.inner.reducer.as_ref(), previous.clone(), &event)?;
         self.inner.current.replace(result.snapshot.clone());
 
         if !Rc::ptr_eq(&previous, &result.snapshot) {
             self.inner.observers.publish()?;
         }
+
+        self.inner.inspectors.notify(&event, &result.snapshot)?;
 
         let scope = EffectScope::new(self.clone(), result.snapshot);
         for effect in result.effects {
@@ -35,6 +39,7 @@ impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
             }
         }
         scope.complete();
+        drop(event);
         Ok(())
     }
 }

@@ -1,5 +1,11 @@
 import init, { FixtureStore } from "../generated/rstate_wasm";
-import type { Engine, Recorder, ScenarioName, Snapshot } from "./contract";
+import type {
+  Engine,
+  Inspection,
+  Recorder,
+  ScenarioName,
+  Snapshot,
+} from "./contract";
 
 let initialized: Promise<unknown> | undefined;
 
@@ -16,13 +22,14 @@ export function createRust(scenario: ScenarioName, record: Recorder): Engine {
 
 export function wrapRustStore(store: FixtureStore): Engine {
   const snapshots = new Map<number, Snapshot>();
-  const decode = (serialized: string): Snapshot => {
-    const next = JSON.parse(serialized) as Snapshot;
+  const retain = (next: Snapshot): Snapshot => {
     const previous = snapshots.get(next.snapshotId);
     if (previous) return previous;
     snapshots.set(next.snapshotId, next);
     return next;
   };
+  const decode = (serialized: string): Snapshot =>
+    retain(JSON.parse(serialized));
   let disposed = false;
   return {
     snapshot: () => decode(store.snapshot()),
@@ -34,6 +41,18 @@ export function wrapRustStore(store: FixtureStore): Engine {
       const id = store.subscribe((serialized: string) =>
         callback(decode(serialized)),
       );
+      return () => {
+        if (!disposed) store.unsubscribe(id);
+      };
+    },
+    inspect: (callback) => {
+      const id = store.inspect((serialized: string) => {
+        const record = JSON.parse(serialized) as Inspection;
+        callback({
+          event: record.event,
+          snapshot: retain(record.snapshot),
+        });
+      });
       return () => {
         if (!disposed) store.unsubscribe(id);
       };

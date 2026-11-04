@@ -23,6 +23,9 @@ declare module "@reference/store" {
     getInitialSnapshot(): SourceSnapshot;
     transition(snapshot: SourceSnapshot, event: Event): Result;
     subscribe(callback: (snapshot: SourceSnapshot) => void): Subscription;
+    inspect(
+      callback: (record: { event: Event; snapshot: SourceSnapshot }) => void,
+    ): Subscription;
     select<T>(
       selector: (context: Context) => T,
       compare: (left: T, right: T) => boolean,

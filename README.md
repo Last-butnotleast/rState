@@ -1,6 +1,6 @@
 # rstate
 
-A small synchronous Rust state store with typed events, shared snapshots, pure transitions, subscriptions, effects, emitted events, context selections and reusable factories. The library uses the Rust standard library and `thiserror`; JavaScript, serialization and browser dependencies stay in the separate test adapter.
+A small synchronous Rust state store with typed events, shared snapshots, pure transitions, subscriptions, effects, emitted events, transition inspection, context selections and reusable factories. The library uses the Rust standard library and `thiserror`; JavaScript, serialization and browser dependencies stay in the separate test adapter.
 
 The selected behavior follows [`@xstate/store` 4.3.0 at commit `9b3a88f`](https://github.com/statelyai/xstate/tree/9b3a88fa43f4be5433797acfba18f27c40494bd2/packages/xstate-store). This is a core implementation, not a port of the complete package or its extensions.
 
@@ -98,6 +98,34 @@ assert_eq!(*second.get_snapshot().context, 10);
 
 Each creation allocates fresh context and snapshot handles with independent subscriptions, emissions and selection caches. An initializer failure returns its `StoreError` before a store is created and leaves the factory reusable. Factories share their initializer and reducer callbacks through `Rc`; captured application state inside those callbacks is intentionally shared. Cloning a factory adds no `Clone` bounds to input, context, event or emitted types, and dropping it does not invalidate stores already created from it.
 
+## Inspecting transitions
+
+`store.inspect(callback)` immediately reports `Inspection::Initial` with the current snapshot, then reports `Inspection::Transition` for each received outer event, including unchanged and unknown events. It returns `StoreResult<Subscription>`; use explicit `unsubscribe` to remove the inspector. Dropping the returned handle leaves registration active.
+
+```rust
+use rstate::Inspection;
+
+let inspection = store.inspect(|record| {
+    match record {
+        Inspection::Initial { snapshot } => {
+            println!("initial count: {}", snapshot.context.count);
+        }
+        Inspection::Transition { snapshot, .. } => {
+            println!("transition count: {}", snapshot.context.count);
+        }
+    }
+    Ok(())
+}).unwrap();
+
+inspection.unsubscribe();
+```
+
+A transition record borrows its event for the callback and owns a shared snapshot handle that the callback can retain. Inspection does not require events or contexts to implement `Clone`. The record's snapshot belongs to that dispatch, even if a subscriber or another inspector has synchronously sent a newer event.
+
+State is committed before ordinary and selected subscribers run, followed by inspectors and then effects or emitted events. Subscriber failure skips inspection and effects. Inspector failure stops later inspectors and effects while retaining committed state. Internal queued triggers produce one final outer record; `can` and pure `transition` queries produce no inspection records.
+
+Inspector iteration follows live registration order: removing a listener before its turn skips it, while adding a listener during notification gives it an immediate initial record and then the current transition record. Registration precedes the immediate callback. If that callback fails, `inspect` returns its error while the registration remains active and no unsubscribe handle is returned, matching the reference behavior.
+
 ## Layout
 
 `crates/rstate/src` composes focused files under five domains: state, transition, effects, observation and store. Native behavior tests live in the separate mirrored `crates/rstate/tests` tree and use a single explicit Cargo integration-test target. No handwritten code comments or inline test modules are used.
@@ -125,4 +153,4 @@ See the test app's README for browser setup, building the WASM adapter and runni
 
 ## Current boundary
 
-The core is intentionally single-threaded and synchronous. General atoms, cross-store reactive dependency graphs, async/source atoms, managed async effects, persistence, reset/undo, validation, inspection and XState actor integration are outside the implementation scope.
+The core is intentionally single-threaded and synchronous. General atoms, cross-store reactive dependency graphs, async/source atoms, managed async effects, persistence, reset/undo, validation and XState actor integration are outside the implementation scope. Transition inspection emits callbacks only; it does not retain history or implement the XState actor inspection protocol.

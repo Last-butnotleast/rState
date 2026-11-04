@@ -9,6 +9,10 @@ export type Snapshot = {
 export type Message = { type: string; total?: number };
 export type TraceEntry = Record<string, unknown>;
 export type Recorder = (entry: TraceEntry) => void;
+export type Inspection = {
+  event: Event;
+  snapshot: Snapshot;
+};
 
 export interface Engine {
   snapshot(): Snapshot;
@@ -21,6 +25,7 @@ export interface Engine {
     allowed: boolean;
   };
   subscribe(callback: (snapshot: Snapshot) => void): () => void;
+  inspect(callback: (record: Inspection) => void): () => void;
   subscribeSelected(
     field: "count" | "total",
     callback: (value: number) => void,
@@ -31,7 +36,16 @@ export interface Engine {
 }
 
 export type Operation = {
-  op: "subscribe" | "unsubscribe" | "send" | "can" | "transition" | "snapshot";
+  op:
+    | "subscribe"
+    | "subscribeSelected"
+    | "inspect"
+    | "unsubscribe"
+    | "send"
+    | "can"
+    | "transition"
+    | "snapshot";
+  field?: "count" | "total";
   listener?: string;
   event?: Event;
   send?: Event;

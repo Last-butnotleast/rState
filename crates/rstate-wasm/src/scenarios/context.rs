@@ -7,7 +7,7 @@ pub struct Context {
     pub total: i64,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Event {
     Inc {

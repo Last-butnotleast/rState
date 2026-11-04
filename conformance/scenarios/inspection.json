@@ -1,0 +1,32 @@
+{
+  "name": "Inspection reports current snapshots and outer transitions before effects",
+  "scenario": "ordering",
+  "steps": [
+    { "op": "send", "event": { "type": "inc", "by": 3 } },
+    { "op": "inspect", "listener": "a" },
+    { "op": "subscribe", "listener": "state" },
+    { "op": "subscribeSelected", "field": "count", "listener": "selected" },
+    { "op": "can", "event": { "type": "start" } },
+    { "op": "transition", "event": { "type": "start" } },
+    { "op": "send", "event": { "type": "keep" } },
+    { "op": "send", "event": { "type": "same" } },
+    { "op": "send", "event": { "type": "unknown" } },
+    {
+      "op": "inspect",
+      "listener": "nested",
+      "whenCount": 4,
+      "send": { "type": "bump", "by": 2 }
+    },
+    { "op": "send", "event": { "type": "start" } },
+    { "op": "snapshot" },
+    { "op": "unsubscribe", "listener": "nested" },
+    { "op": "inspect", "listener": "late" },
+    { "op": "send", "event": { "type": "effectFail" } },
+    { "op": "unsubscribe", "listener": "a" },
+    { "op": "unsubscribe", "listener": "late" },
+    { "op": "unsubscribe", "listener": "state" },
+    { "op": "unsubscribe", "listener": "selected" },
+    { "op": "send", "event": { "type": "bump", "by": 1 } },
+    { "op": "snapshot" }
+  ]
+}

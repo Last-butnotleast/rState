@@ -42,6 +42,12 @@ export function wrapReference(store: SourceStore): Engine {
       );
       return register(() => subscription.unsubscribe());
     },
+    inspect: (callback) => {
+      const subscription = store.inspect((record) =>
+        callback({ event: record.event, snapshot: snapshot(record.snapshot) }),
+      );
+      return register(() => subscription.unsubscribe());
+    },
     subscribeSelected: (field, callback) => {
       const selection = store.select((context) => context[field], Object.is);
       const subscription = selection.subscribe(callback);

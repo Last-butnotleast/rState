@@ -7,7 +7,7 @@ use rstate::{StoreError, StoreResult, Subscription};
 use serde_json::{Value, json};
 use wasm_bindgen::prelude::*;
 
-use super::identity::Identities;
+use super::{identity::Identities, inspection};
 use crate::scenarios::{self, Event, Fixture, Message};
 
 #[wasm_bindgen]
@@ -69,6 +69,16 @@ impl FixtureStore {
             let value = identities.borrow_mut().snapshot(&snapshot);
             invoke(&callback, &value)
         });
+        Ok(self.register(id, subscription))
+    }
+
+    pub fn inspect(&self, callback: Function) -> Result<u32, JsValue> {
+        let id = self.next_id()?;
+        let identities = self.identities.clone();
+        let subscription = self
+            .store
+            .inspect(move |record| inspection::notify(&record, &identities, &callback))
+            .map_err(|value| error(&value))?;
         Ok(self.register(id, subscription))
     }
 
@@ -144,14 +154,16 @@ impl FixtureStore {
     }
 
     fn next_id(&self) -> Result<u32, JsValue> {
-        self.next_subscription
+        let id = self
+            .next_subscription
             .get()
             .checked_add(1)
-            .ok_or_else(|| JsValue::from_str("subscription limit reached"))
+            .ok_or_else(|| JsValue::from_str("subscription limit reached"))?;
+        self.next_subscription.set(id);
+        Ok(id)
     }
 
     fn register(&self, id: u32, subscription: Subscription) -> u32 {
-        self.next_subscription.set(id);
         self.subscriptions.borrow_mut().insert(id, subscription);
         id
     }
