@@ -1,6 +1,6 @@
 use std::{cell::Cell, rc::Rc};
 
-use gpui::{AppContext, Context, Entity, TestAppContext};
+use gpui_kit::{AppContext, Context, Entity, TestAppContext};
 use rstate::{Store, StoreConfig, StoreError, Update};
 use rstate_gpui::{SelectionBinding, ViewBindings};
 

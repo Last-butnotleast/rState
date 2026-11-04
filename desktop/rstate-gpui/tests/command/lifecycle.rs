@@ -1,13 +1,13 @@
 use std::{cell::RefCell, rc::Rc};
 
-use gpui::TestAppContext;
+use gpui_kit::TestAppContext;
 use rstate_gpui::{CommandPolicy, CommandScope, CommandSubmitError};
 
 use super::support::{Gate, unexpected};
 use crate::support::{Event, counter, observe, view};
 
-#[gpui::test]
-fn scope_invalidation_is_reusable_and_close_rejects_submissions(cx: &mut TestAppContext) {
+#[gpui_kit::test]
+fn scope_invalidation_is_reusable_and_close_rejects_submissions(cx: &TestAppContext) {
     let scope = cx.update(|cx| CommandScope::new(cx));
     let channel = scope.channel(CommandPolicy::Concurrent);
     let gate = Gate::default();
@@ -49,8 +49,8 @@ fn scope_invalidation_is_reusable_and_close_rejects_submissions(cx: &mut TestApp
     );
 }
 
-#[gpui::test]
-fn dropping_scope_cancels_owned_futures_without_channel_cycles(cx: &mut TestAppContext) {
+#[gpui_kit::test]
+fn dropping_scope_cancels_owned_futures_without_channel_cycles(cx: &TestAppContext) {
     let scope = cx.update(|cx| CommandScope::new(cx));
     let channel = scope.channel(CommandPolicy::Concurrent);
     let capture = Rc::new(());
@@ -81,7 +81,7 @@ fn dropping_scope_cancels_owned_futures_without_channel_cycles(cx: &mut TestAppC
     );
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn manager_owned_work_survives_one_consuming_view(cx: &mut TestAppContext) {
     let store = counter();
     let first = view(cx, &store, 1);
@@ -110,8 +110,8 @@ fn manager_owned_work_survives_one_consuming_view(cx: &mut TestAppContext) {
     assert_eq!(count.get(), 1);
 }
 
-#[gpui::test]
-fn invalidating_one_channel_preserves_an_independent_operation(cx: &mut TestAppContext) {
+#[gpui_kit::test]
+fn invalidating_one_channel_preserves_an_independent_operation(cx: &TestAppContext) {
     let scope = cx.update(|cx| CommandScope::new(cx));
     let first = scope.channel(CommandPolicy::Latest);
     let second = scope.channel(CommandPolicy::Concurrent);
@@ -141,8 +141,8 @@ fn invalidating_one_channel_preserves_an_independent_operation(cx: &mut TestAppC
     assert_eq!(&*values.borrow(), &[8]);
 }
 
-#[gpui::test]
-fn dropping_scope_cancels_a_serial_request_already_draining(cx: &mut TestAppContext) {
+#[gpui_kit::test]
+fn dropping_scope_cancels_a_serial_request_already_draining(cx: &TestAppContext) {
     let scope = cx.update(|cx| CommandScope::new(cx));
     let channel = scope.channel(CommandPolicy::Serial);
     let capture = Rc::new(());
@@ -166,4 +166,66 @@ fn dropping_scope_cancels_a_serial_request_already_draining(cx: &mut TestAppCont
     cx.run_until_parked();
     assert!(weak.upgrade().is_none());
     assert!(channel.is_closed());
+}
+
+#[gpui_kit::test]
+fn app_shutdown_cancels_queued_commands_before_app_release(cx: &TestAppContext) {
+    let app = cx.new_app();
+    let scope = app.update(|cx| CommandScope::new(cx));
+    let channel = scope.channel(CommandPolicy::Concurrent);
+    let capture = Rc::new(());
+    let weak = Rc::downgrade(&capture);
+    let ticket = channel
+        .submit(
+            move |_| -> std::future::Ready<()> {
+                drop(capture);
+                panic!("shutdown command started")
+            },
+            |(), _| panic!("shutdown output delivered"),
+            unexpected,
+        )
+        .unwrap();
+    app.quit();
+    assert!(scope.is_closed());
+    assert!(channel.is_closed());
+    assert!(!ticket.is_pending());
+    assert!(weak.upgrade().is_none());
+    drop(app);
+    cx.run_until_parked();
+    assert_eq!(
+        channel
+            .submit(|_| async {}, |(), _| Ok(()), unexpected)
+            .unwrap_err(),
+        CommandSubmitError::Closed
+    );
+}
+
+#[gpui_kit::test]
+fn app_shutdown_cancels_running_commands_and_suppresses_late_delivery(cx: &TestAppContext) {
+    let app = cx.new_app();
+    let scope = app.update(|cx| CommandScope::new(cx));
+    let channel = scope.channel(CommandPolicy::Concurrent);
+    let capture = Rc::new(());
+    let weak = Rc::downgrade(&capture);
+    let gate = Gate::default();
+    let wait = gate.clone();
+    let ticket = channel
+        .submit(
+            move |_| async move {
+                wait.wait().await;
+                drop(capture);
+            },
+            |(), _| panic!("shutdown output delivered"),
+            unexpected,
+        )
+        .unwrap();
+    cx.run_until_parked();
+    assert!(weak.upgrade().is_some());
+    app.quit();
+    assert!(scope.is_closed());
+    assert!(!ticket.is_pending());
+    drop(app);
+    gate.release();
+    cx.run_until_parked();
+    assert!(weak.upgrade().is_none());
 }

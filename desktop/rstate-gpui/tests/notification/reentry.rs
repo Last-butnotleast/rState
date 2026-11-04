@@ -1,10 +1,10 @@
 use std::{cell::RefCell, rc::Rc};
 
-use gpui::TestAppContext;
+use gpui_kit::TestAppContext;
 
 use crate::support::{Event, counter, observe, view};
 
-#[gpui::test]
+#[gpui_kit::test]
 fn notification_can_dispatch_and_schedule_followup_work(cx: &mut TestAppContext) {
     let store = counter();
     let view = view(cx, &store, 1);
@@ -25,7 +25,7 @@ fn notification_can_dispatch_and_schedule_followup_work(cx: &mut TestAppContext)
     assert_eq!(view.read_with(cx, |view, _| *view.values[0].get()), 2);
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn nested_same_and_cross_store_sends_remain_synchronous_in_gpui_handler(cx: &mut TestAppContext) {
     let first = counter();
     let second = counter();

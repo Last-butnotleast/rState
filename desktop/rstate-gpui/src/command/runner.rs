@@ -4,7 +4,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use gpui::{App, AsyncApp};
+use gpui_kit::{App, AsyncApp, Subscription};
 use rstate::{StoreError, StoreResult};
 
 use super::{
@@ -25,18 +25,29 @@ pub struct Runner {
     minimum: Cell<u64>,
     scheduled: Cell<bool>,
     state: RefCell<State>,
+    _quit: Subscription,
 }
 
 impl Runner {
-    pub fn new(cx: &App) -> Self {
-        Self {
-            app: cx.to_async(),
-            closed: Cell::new(false),
-            next_id: Cell::new(1),
-            minimum: Cell::new(0),
-            scheduled: Cell::new(false),
-            state: RefCell::new(State::default()),
-        }
+    pub fn new(cx: &App) -> Rc<Self> {
+        Rc::new_cyclic(|owner: &Weak<Self>| {
+            let owner = owner.clone();
+            let quit = cx.on_app_quit(move |_| {
+                if let Some(owner) = owner.upgrade() {
+                    owner.close();
+                }
+                async {}
+            });
+            Self {
+                app: cx.to_async(),
+                closed: Cell::new(false),
+                next_id: Cell::new(1),
+                minimum: Cell::new(0),
+                scheduled: Cell::new(false),
+                state: RefCell::new(State::default()),
+                _quit: quit,
+            }
+        })
     }
 
     pub const fn is_closed(&self) -> bool {
@@ -224,8 +235,8 @@ impl Runner {
             task.detach();
         }
         drop(removed);
-        if active && let Ok(Err(error)) = cx.update(|cx| deliver(output, cx)) {
-            let _ = cx.update(|cx| on_error(error, cx));
+        if active && let Err(error) = cx.update(|cx| deliver(output, cx)) {
+            cx.update(|cx| on_error(error, cx));
         }
         request.lane.release(request.id);
         owner.schedule();

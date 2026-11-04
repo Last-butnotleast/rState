@@ -1,12 +1,12 @@
 use std::{cell::RefCell, rc::Rc};
 
-use gpui::TestAppContext;
+use gpui_kit::TestAppContext;
 use rstate_gpui::{CommandPolicy, CommandScope};
 
 use super::support::{Gate, unexpected};
 
-#[gpui::test]
-fn factories_start_deferred_fifo_and_scope_owns_dropped_tickets(cx: &mut TestAppContext) {
+#[gpui_kit::test]
+fn factories_start_deferred_fifo_and_scope_owns_dropped_tickets(cx: &TestAppContext) {
     let scope = cx.update(|cx| CommandScope::new(cx));
     let channel = scope.channel(CommandPolicy::Concurrent);
     let trace = Rc::new(RefCell::new(Vec::new()));
@@ -38,8 +38,8 @@ fn factories_start_deferred_fifo_and_scope_owns_dropped_tickets(cx: &mut TestApp
     assert_eq!(delivered, [10, 20, 30]);
 }
 
-#[gpui::test]
-fn independent_channels_complete_out_of_order(cx: &mut TestAppContext) {
+#[gpui_kit::test]
+fn independent_channels_complete_out_of_order(cx: &TestAppContext) {
     let scope = cx.update(|cx| CommandScope::new(cx));
     let first = scope.channel(CommandPolicy::Concurrent);
     let second = scope.channel(CommandPolicy::Concurrent);
@@ -82,8 +82,8 @@ fn independent_channels_complete_out_of_order(cx: &mut TestAppContext) {
     assert!(!first_ticket.is_pending());
 }
 
-#[gpui::test]
-fn latest_cancels_queued_and_running_predecessors(cx: &mut TestAppContext) {
+#[gpui_kit::test]
+fn latest_cancels_queued_and_running_predecessors(cx: &TestAppContext) {
     let scope = cx.update(|cx| CommandScope::new(cx));
     let channel = scope.channel(CommandPolicy::Latest);
     let starts = Rc::new(RefCell::new(Vec::new()));
@@ -138,8 +138,8 @@ fn latest_cancels_queued_and_running_predecessors(cx: &mut TestAppContext) {
     assert!(!tickets[1].is_pending());
 }
 
-#[gpui::test]
-fn serial_factories_wait_for_completion_and_delivery(cx: &mut TestAppContext) {
+#[gpui_kit::test]
+fn serial_factories_wait_for_completion_and_delivery(cx: &TestAppContext) {
     let scope = cx.update(|cx| CommandScope::new(cx));
     let channel = scope.channel(CommandPolicy::Serial);
     let gate = Gate::default();
@@ -198,8 +198,8 @@ fn serial_factories_wait_for_completion_and_delivery(cx: &mut TestAppContext) {
     assert_eq!(&*trace.borrow(), &[1, 11, 2, 12, 3, 13]);
 }
 
-#[gpui::test]
-fn cancelled_serial_work_drains_before_next_factory(cx: &mut TestAppContext) {
+#[gpui_kit::test]
+fn cancelled_serial_work_drains_before_next_factory(cx: &TestAppContext) {
     let scope = cx.update(|cx| CommandScope::new(cx));
     let channel = scope.channel(CommandPolicy::Serial);
     let gate = Gate::default();

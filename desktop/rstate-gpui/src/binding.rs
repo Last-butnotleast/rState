@@ -1,6 +1,6 @@
 use std::{fmt, rc::Rc};
 
-use gpui::Context;
+use gpui_kit::Context;
 use rstate::{ScopedSubscription, Selection};
 
 use crate::notification::NotificationTarget;

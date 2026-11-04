@@ -3,7 +3,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use gpui::{AsyncApp, Task};
+use gpui_kit::{AsyncApp, Task};
 
 use super::{CommandPolicy, runner::Runner};
 

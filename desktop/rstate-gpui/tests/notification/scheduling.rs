@@ -1,8 +1,8 @@
-use gpui::TestAppContext;
+use gpui_kit::TestAppContext;
 
 use crate::support::{Event, counter, observe, view};
 
-#[gpui::test]
+#[gpui_kit::test]
 fn bindings_share_one_detached_job_and_later_changes_schedule_again(cx: &mut TestAppContext) {
     let store = counter();
     let view = view(cx, &store, 3);
@@ -21,7 +21,7 @@ fn bindings_share_one_detached_job_and_later_changes_schedule_again(cx: &mut Tes
     assert_eq!(notifications.get(), 2);
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn separate_view_targets_notify_independently(cx: &mut TestAppContext) {
     let store = counter();
     let first = view(cx, &store, 2);

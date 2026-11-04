@@ -9,7 +9,7 @@ use std::{
     task::{Poll, Waker},
 };
 
-use gpui::App;
+use gpui_kit::App;
 use rstate::StoreError;
 
 #[derive(Clone, Default)]

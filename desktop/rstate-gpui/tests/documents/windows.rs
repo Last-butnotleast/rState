@@ -1,8 +1,8 @@
-use gpui::TestAppContext;
+use gpui_kit::TestAppContext;
 
 use super::view::{Action, open_documents};
 
-#[gpui::test]
+#[gpui_kit::test]
 fn shared_windows_render_changes_and_independent_document_survives_closure(
     cx: &mut TestAppContext,
 ) {
@@ -70,7 +70,7 @@ fn shared_windows_render_changes_and_independent_document_survives_closure(
     );
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn document_controls_restore_shared_views_and_errors_are_visible(cx: &mut TestAppContext) {
     let windows = cx.update(|cx| open_documents(cx).unwrap());
     for action in [

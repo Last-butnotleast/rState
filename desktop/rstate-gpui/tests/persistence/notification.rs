@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use gpui::{AppContext, TestAppContext};
+use gpui_kit::{AppContext, TestAppContext};
 use rstate::{PersistenceActivity, PersistenceOutcome};
 use rstate_gpui::ViewBindings;
 
@@ -8,7 +8,7 @@ use crate::support::{Event, View, observe};
 
 use super::support::{Storage, store};
 
-#[gpui::test]
+#[gpui_kit::test]
 fn status_and_selection_bindings_share_a_target_and_read_live_recovery(cx: &mut TestAppContext) {
     let storage = Storage::default();
     let store = store(&storage).unwrap();
@@ -41,7 +41,7 @@ fn status_and_selection_bindings_share_a_target_and_read_live_recovery(cx: &mut 
     assert_eq!(view.read_with(cx, |view, _| *view.values[0].get()), 1);
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn explicit_status_operations_notify_without_changing_domain_snapshot(cx: &mut TestAppContext) {
     let storage = Storage::default();
     let store = store(&storage).unwrap();

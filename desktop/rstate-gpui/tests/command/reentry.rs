@@ -1,12 +1,12 @@
 use std::{cell::RefCell, rc::Rc};
 
-use gpui::TestAppContext;
+use gpui_kit::TestAppContext;
 use rstate_gpui::{CommandPolicy, CommandScope};
 
 use super::support::{BackgroundGate, Gate, OnDrop, unexpected};
 
-#[gpui::test]
-fn cancelled_factory_captures_drop_outside_borrows_and_can_submit(cx: &mut TestAppContext) {
+#[gpui_kit::test]
+fn cancelled_factory_captures_drop_outside_borrows_and_can_submit(cx: &TestAppContext) {
     let scope = cx.update(|cx| CommandScope::new(cx));
     let channel = scope.channel(CommandPolicy::Concurrent);
     let values = Rc::new(RefCell::new(Vec::new()));
@@ -39,8 +39,8 @@ fn cancelled_factory_captures_drop_outside_borrows_and_can_submit(cx: &mut TestA
     assert_eq!(&*values.borrow(), &[2]);
 }
 
-#[gpui::test]
-fn latest_reentrant_replacement_preserves_newest_request(cx: &mut TestAppContext) {
+#[gpui_kit::test]
+fn latest_reentrant_replacement_preserves_newest_request(cx: &TestAppContext) {
     let scope = cx.update(|cx| CommandScope::new(cx));
     let channel = scope.channel(CommandPolicy::Latest);
     let values = Rc::new(RefCell::new(Vec::new()));
@@ -80,8 +80,8 @@ fn latest_reentrant_replacement_preserves_newest_request(cx: &mut TestAppContext
     assert_eq!(&*values.borrow(), &[3]);
 }
 
-#[gpui::test]
-fn invalidating_serial_factory_drains_already_submitted_background_work(cx: &mut TestAppContext) {
+#[gpui_kit::test]
+fn invalidating_serial_factory_drains_already_submitted_background_work(cx: &TestAppContext) {
     let scope = cx.update(|cx| CommandScope::new(cx));
     let channel = scope.channel(CommandPolicy::Serial);
     let gate = BackgroundGate::default();
@@ -121,8 +121,8 @@ fn invalidating_serial_factory_drains_already_submitted_background_work(cx: &mut
     assert_eq!(&*trace.borrow(), &[1, 2]);
 }
 
-#[gpui::test]
-fn factory_can_close_its_scope_and_release_future_captures(cx: &mut TestAppContext) {
+#[gpui_kit::test]
+fn factory_can_close_its_scope_and_release_future_captures(cx: &TestAppContext) {
     let scope = Rc::new(RefCell::new(Some(cx.update(|cx| CommandScope::new(cx)))));
     let channel = scope
         .borrow()
@@ -148,8 +148,8 @@ fn factory_can_close_its_scope_and_release_future_captures(cx: &mut TestAppConte
     assert!(weak.upgrade().is_none());
 }
 
-#[gpui::test]
-fn cancellation_of_started_future_can_submit_from_capture_destruction(cx: &mut TestAppContext) {
+#[gpui_kit::test]
+fn cancellation_of_started_future_can_submit_from_capture_destruction(cx: &TestAppContext) {
     let scope = cx.update(|cx| CommandScope::new(cx));
     let channel = scope.channel(CommandPolicy::Concurrent);
     let reenter = channel.clone();
@@ -185,8 +185,8 @@ fn cancellation_of_started_future_can_submit_from_capture_destruction(cx: &mut T
     assert_eq!(&*values.borrow(), &[5]);
 }
 
-#[gpui::test]
-fn scope_reset_during_replacement_cleanup_invalidates_reserved_request(cx: &mut TestAppContext) {
+#[gpui_kit::test]
+fn scope_reset_during_replacement_cleanup_invalidates_reserved_request(cx: &TestAppContext) {
     let scope = Rc::new(cx.update(|cx| CommandScope::new(cx)));
     let channel = scope.channel(CommandPolicy::Latest);
     let owner = Rc::downgrade(&scope);

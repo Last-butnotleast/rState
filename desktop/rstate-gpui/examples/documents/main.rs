@@ -1,6 +1,6 @@
 use std::{cell::RefCell, error::Error, rc::Rc};
 
-use gpui::{App, Application};
+use gpui_kit::App;
 
 mod domain;
 mod smoke;
@@ -10,8 +10,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let smoke = std::env::args().any(|argument| argument == "--smoke");
     let result = Rc::new(RefCell::new(None));
     let output = result.clone();
-    Application::new().run(move |cx: &mut App| {
-        cx.on_window_closed(|cx| {
+    gpui_kit::application().run(move |cx: &mut App| {
+        gpui_kit::init(cx);
+        cx.on_window_closed(|cx, _| {
             if cx.windows().is_empty() {
                 cx.quit();
             }
@@ -27,9 +28,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             eprintln!("Document smoke failed: {error}");
                         }
                         output.replace(Some(outcome));
-                        if let Err(error) = cx.update(|cx| cx.quit()) {
-                            eprintln!("Unable to quit document smoke: {error}");
-                        }
+                        cx.update(|cx| cx.quit());
                     })
                     .detach();
                 }

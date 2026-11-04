@@ -1,10 +1,10 @@
 # rstate-gpui
 
-The adapter connects rState selections and persistence feedback to Zed GPUI views, and owns asynchronous application work through explicit command scopes. Domain dispatch remains synchronous. Changed bindings queue a detached foreground task that notifies the consuming entity after its current handler returns. Several changed bindings sharing one target produce one pending notification. Reads return current shared values; queued invalidation never captures a snapshot for rendering.
+The adapter connects rState selections and persistence feedback to GPUI Kit views, and owns asynchronous application work through explicit command scopes. Domain dispatch remains synchronous. Changed bindings queue a detached foreground task that notifies the consuming entity after its current handler returns. Several changed bindings sharing one target produce one pending notification. Reads return current shared values; queued invalidation never captures a snapshot for rendering.
 
-This package uses exactly `gpui` 0.2.2 from crates.io. It is a separate desktop workspace, verified with Rust 1.98 on Linux, and is not published. The core workspace retains its Rust 1.85 baseline and WASM boundary. The different GPUI distributions used by gpuikit and Longbridge gpui-kit have distinct entity and context types and are not supported by this package.
+This package supports exactly `gpui-kit` 0.8.1 from crates.io, whose default backend is pinned to `gpui-pre` 0.3.10. This is the same toolkit used by `agent_git`. It is a separate desktop workspace, verified with Rust 1.98 on Linux, and is not published. The core workspace retains its Rust 1.85 baseline and WASM boundary.
 
-Consumers use the same `gpui = "=0.2.2"` package when constructing entities and contexts for the adapter. The adapter's Linux manifest also constrains `libc` to `=0.2.189`: GPUI 0.2.2 indirectly depends on `xattr` 0.2.3, which references the compatibility constant `libc::ENOATTR` removed in newer libc releases. This constraint participates in a consumer's dependency resolution; copying this repository's lockfile is unnecessary. It also means consumers requiring a conflicting libc release need an engine/dependency upgrade rather than a second incompatible lockfile. The core has no libc or GPUI dependency.
+Consumers use `gpui-kit = "=0.8.1"` and import its types through `gpui_kit`. The toolkit supplies matching engine and platform packages. Native applications start with `gpui_kit::application()` and initialize the toolkit with `gpui_kit::init(cx)`. The adapter adds no direct libc constraint. The core has no libc or GPUI dependency.
 
 ## Bind selected state
 
@@ -90,7 +90,9 @@ Submission only records a command and schedules foreground startup after the cur
 
 `channel.submit(factory, deliver, on_error)` passes an owned `AsyncApp` to the foreground factory and accepts non-`Send` futures and results. `submit_background` accepts a factory without an app context and runs its future on GPUI's background executor. Only that background factory, its future and its result require `Send`. Contexts, stores, delivery callbacks and foreground selected values remain on the UI thread without new `Clone`, serialization or thread-safety bounds. The adapter adds no async runtime; work must be compatible with its selected executor and any application-provided I/O integration.
 
-`deliver(result, &mut App)` runs on the UI thread and returns `StoreResult<()>`. Expected operation failures can be part of the application's typed result, such as `Result<Response, RequestError>`, and are delivered normally. A failure returned while publishing that result is passed unchanged to `on_error(StoreError, &mut App)` exactly once, including the original dispatch status. The bridge never retries or rolls back a domain event. A released app suppresses delivery during ordinary cleanup.
+`deliver(result, &mut App)` runs on the UI thread and returns `StoreResult<()>`. Expected operation failures can be part of the application's typed result, such as `Result<Response, RequestError>`, and are delivered normally. A failure returned while publishing that result is passed unchanged to `on_error(StoreError, &mut App)` exactly once, including the original dispatch status. The bridge never retries or rolls back a domain event.
+
+Orderly GPUI shutdown automatically closes command scopes through a weak quit registration. Closing a scope suppresses pending delivery and releases its task handles. If an embedding or test releases an app without running shutdown, close or drop its command scopes first. The selected engine's `AsyncApp::update` returns the callback result directly and panics if used after app release. Keep foreground app access within the app's lifetime; an `AsyncApp` does not keep the app alive.
 
 Request IDs increase within their scope and live outside domain snapshots and undo history. `ticket.cancel()` invalidates one request; `channel.invalidate()` invalidates an operation lane; `scope.invalidate()` invalidates all current work while leaving the scope reusable. Call these explicitly when inputs, application reset or lifetime rules make old outcomes obsolete. `scope.close()` permanently rejects new submissions, and dropping a scope closes it. Submission after closure or owner release returns `CommandSubmitError::Closed`.
 
@@ -98,7 +100,7 @@ Dropping an ordinary ticket does not cancel its command. `ticket.is_pending()` r
 
 ## Build and verify
 
-Run these commands from the repository root. GPUI on Linux needs its native build libraries, including fontconfig, FreeType, xkbcommon, X11/XCB, Wayland and Vulkan. Platform requirements follow the selected [GPUI release](https://docs.rs/crate/gpui/0.2.2/source/README.md). This integration is currently verified on Linux; macOS and Windows are not verified.
+Run these commands from the repository root. GPUI on Linux needs its native build libraries, including fontconfig, FreeType, xkbcommon, X11/XCB, Wayland and Vulkan. Platform requirements follow the selected [GPUI Kit release](https://github.com/longbridge/gpui-kit/releases/tag/v0.8.1). This integration is currently verified on Linux; macOS and Windows are not verified.
 
 On Debian/Ubuntu, install the same development packages as desktop CI. `libxkbcommon-x11-dev` supplies the unversioned linker library; the runtime package alone is insufficient.
 
@@ -115,7 +117,7 @@ python3 desktop/scripts/check-consumer.py
 CARGO_BUILD_JOBS=2 cargo run --manifest-path desktop/Cargo.toml --locked -p rstate-gpui --example documents
 ```
 
-The consumer check copies only the standalone fixture's manifest and source into a temporary workspace, generates its own lockfile, verifies one matching GPUI package identity plus the compatible libc release, and checks the public API from that consumer. It reuses compiled artifacts in `desktop/target` but never copies a repository lockfile or adds a dependency patch. Pass `--offline` when the required registry data and packages are already cached. Desktop CI runs fresh resolution to catch changes allowed by upstream dependency constraints.
+The consumer check copies only the standalone fixture's manifest and source into a temporary workspace, generates its own lockfile, verifies matching toolkit, engine and platform package identities, and builds the public API consumer. It reuses compiled artifacts in `desktop/target` but never copies a repository lockfile or adds a dependency patch. Pass `--offline` when the required registry data and packages are already cached. Desktop CI runs fresh resolution to catch changes allowed by upstream dependency constraints.
 
 The deterministic tests use actual GPUI entities, observers and its foreground test scheduler. They cover notification lifetime and coalescing, current reads, identity, replacement and release, nested dispatch, history metadata, trait bounds, error routing and store cleanup. The document example supplies a native rendering and action smoke check; see [the example guide](examples/documents/README.md).
 

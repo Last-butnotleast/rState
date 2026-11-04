@@ -9,7 +9,7 @@ publish = false
 resolver = "3"
 
 [dependencies]
-gpui = "=0.2.2"
+gpui-kit = "=0.8.1"
 rstate = { path = "../../../crates/rstate", features = ["json"] }
 rstate-gpui = { path = "../../rstate-gpui" }
 

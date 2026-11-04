@@ -29,25 +29,45 @@ def verify_graph(metadata, consumer):
         "The consumer must resolve as an independent workspace",
     )
     packages = metadata["packages"]
-    engines = [package for package in packages if package["name"] == "gpui"]
-    require(
-        len(engines) == 1 and engines[0]["version"] == "0.2.2",
-        "The consumer must resolve exactly one supported gpui 0.2.2 engine",
-    )
-    libc = [package for package in packages if package["name"] == "libc"]
-    require(
-        len(libc) == 1 and libc[0]["version"] == "0.2.189",
-        "The adapter manifest must constrain libc to the compatible 0.2.189 release",
-    )
-    adapter = next(package for package in packages if package["name"] == "rstate-gpui")
     nodes = {node["id"]: node for node in metadata["resolve"]["nodes"]}
-    engine = engines[0]["id"]
-    for node in [nodes[metadata["resolve"]["root"]], nodes[adapter["id"]]]:
+
+    def package(name, version):
+        matches = [item for item in packages if item["name"] == name]
         require(
-            any(dependency["name"] == "gpui" and dependency["pkg"] == engine
-                for dependency in node["deps"]),
-            "The consumer and adapter must use the same GPUI package identity",
+            len(matches) == 1 and matches[0]["version"] == version,
+            f"The consumer must resolve exactly one supported {name} {version}",
         )
+        return matches[0]
+
+    toolkit = package("gpui-kit", "0.8.1")
+    engine = package("gpui-pre", "0.3.10")
+    platform = package("gpui-pre-platform", "0.3.10")
+    require(
+        not any(item["name"] in {"gpui", "gpui-unofficial"} for item in packages),
+        "The consumer must not resolve another GPUI distribution",
+    )
+    require(
+        "gpui-fast" not in nodes[toolkit["id"]]["features"],
+        "The consumer must use GPUI Kit's default gpui-pre engine",
+    )
+    adapter = next(item for item in packages if item["name"] == "rstate-gpui")
+    require(
+        not any(item["name"] == "libc" for item in adapter["dependencies"]),
+        "The adapter must not depend directly on libc",
+    )
+
+    def uses(node, name, dependency):
+        require(
+            any(item["name"] == name and item["pkg"] == dependency["id"]
+                for item in node["deps"]),
+            f"{node['id']} must use the shared {dependency['name']} package identity",
+        )
+
+    for node in [nodes[metadata["resolve"]["root"]], nodes[adapter["id"]]]:
+        uses(node, "gpui_kit", toolkit)
+    uses(nodes[toolkit["id"]], "gpui", engine)
+    uses(nodes[toolkit["id"]], "gpui_platform", platform)
+    uses(nodes[platform["id"]], "gpui", engine)
 
 
 def main():
@@ -83,8 +103,8 @@ def main():
             capture=True,
         )
         verify_graph(json.loads(metadata.stdout), consumer)
-        cargo(["check", "--locked", "--all-targets", *arguments], environment)
-    print("Fresh consumer passed: independent lockfile, matching GPUI types, compatible libc, public API check")
+        cargo(["build", "--locked", "--all-targets", *arguments], environment)
+    print("Fresh consumer passed: independent lockfile, shared GPUI Kit/core/platform types, public API build and link")
 
 
 if __name__ == "__main__":

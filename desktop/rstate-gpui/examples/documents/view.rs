@@ -1,6 +1,6 @@
 use std::cell::Cell;
 
-use gpui::{
+use gpui_kit::{
     App, AppContext, Bounds, Context, IntoElement, Render, SharedString, TitlebarOptions, Window,
     WindowBounds, WindowHandle, WindowOptions, div, prelude::*, px, rgb, size,
 };
@@ -226,7 +226,7 @@ fn button(
         .rounded_md()
         .bg(rgb(0x2c_43_60))
         .when(!enabled, |button| button.opacity(0.4))
-        .when(enabled, gpui::Styled::cursor_pointer)
+        .when(enabled, gpui_kit::Styled::cursor_pointer)
         .child(label)
         .on_click(cx.listener(move |view, _, _, cx| {
             if enabled {

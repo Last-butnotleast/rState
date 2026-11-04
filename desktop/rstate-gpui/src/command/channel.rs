@@ -4,7 +4,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use gpui::{App, AsyncApp};
+use gpui_kit::{App, AsyncApp};
 use rstate::{StoreError, StoreResult};
 
 use super::{

@@ -1,12 +1,12 @@
 use std::{cell::Cell, rc::Rc};
 
-use gpui::{AppContext, TestAppContext};
+use gpui_kit::{AppContext, TestAppContext};
 use rstate::{Store, StoreConfig, Update};
 use rstate_gpui::ViewBindings;
 
 use crate::support::{Event, counter, observe, view};
 
-#[gpui::test]
+#[gpui_kit::test]
 fn dropped_binding_invalidates_queued_work(cx: &mut TestAppContext) {
     let store = counter();
     let view = view(cx, &store, 1);
@@ -29,7 +29,7 @@ fn dropped_binding_invalidates_queued_work(cx: &mut TestAppContext) {
     assert_eq!(notifications.get(), 1);
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn replacement_keeps_other_live_dirty_work(cx: &mut TestAppContext) {
     let store = counter();
     let view = view(cx, &store, 1);
@@ -51,7 +51,7 @@ fn replacement_keeps_other_live_dirty_work(cx: &mut TestAppContext) {
     assert_eq!(notifications.get(), 2);
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn released_entity_does_not_skip_effects_and_binding_owns_source(cx: &mut TestAppContext) {
     let effects = Rc::new(Cell::new(0_usize));
     let effect_count = effects.clone();
@@ -83,7 +83,7 @@ fn released_entity_does_not_skip_effects_and_binding_owns_source(cx: &mut TestAp
     assert!(weak.upgrade().is_none());
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn closing_one_view_leaves_other_view_active(cx: &mut TestAppContext) {
     let store = counter();
     let first = view(cx, &store, 1);
@@ -101,7 +101,7 @@ fn closing_one_view_leaves_other_view_active(cx: &mut TestAppContext) {
     assert_eq!(second.read_with(cx, |view, _| *view.values[0].get()), 2);
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn detached_notification_does_not_keep_source_store_alive(cx: &mut TestAppContext) {
     let store = counter();
     let weak = store.downgrade();

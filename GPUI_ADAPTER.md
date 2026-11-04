@@ -1,6 +1,6 @@
 # rState GPUI adapter package design
 
-Status: reusable integration in `desktop/rstate-gpui`, using the published Zed `gpui` package pinned to `0.2.2`. The library includes snapshot selections, scoped view bindings, deferred notifications, dispatch error routing, command scopes and persistence feedback. Downstream dependency constraints are checked in a standalone consumer with its own lockfile. The existing document example remains a foundation fixture. The [adapter guide](desktop/rstate-gpui/README.md) records the concrete APIs and verification commands; optional tooling below remains a design proposal.
+Status: reusable integration in `desktop/rstate-gpui`, using `gpui-kit` pinned to `0.8.1` with its default `gpui-pre` 0.3.10 backend. The library includes snapshot selections, scoped view bindings, deferred notifications, dispatch error routing, command scopes and persistence feedback. Downstream dependency identities and linking are checked in a standalone consumer with its own lockfile. The existing document example remains a foundation fixture. The [adapter guide](desktop/rstate-gpui/README.md) records the concrete APIs and verification commands; optional tooling below remains a design proposal.
 
 `rstate-gpui` connects rState's typed application state to GPUI views. rState owns domain data and synchronous transitions; GPUI owns rendering, widgets and presentation state. The adapter translates selected-state changes into deferred view notifications, manages observation lifetimes and provides a consistent place for desktop integration utilities.
 
@@ -26,19 +26,9 @@ The existing behavior and native boundaries are documented in [README.md](README
 
 ## GPUI dependency selection
 
-GPUI and similarly named toolkits use different package distributions. The first implementation must select and lock one engine together with the intended toolkit and platform dependencies.
+The adapter and consumers use exactly `gpui-kit = "=0.8.1"`, the same toolkit as `agent_git`. Its published manifest pins the default `gpui-pre` engine and matching platform packages to `0.3.10`. Applications import types through `gpui_kit`, start the native platform with `gpui_kit::application()`, and call `gpui_kit::init(cx)` before opening windows. See the [selected release](https://github.com/longbridge/gpui-kit/releases/tag/v0.8.1) and [published manifest](https://docs.rs/crate/gpui-kit/0.8.1/source/Cargo.toml).
 
-The adapter selects Zed's published `gpui = "=0.2.2"` directly, without a widget toolkit. Its platform implementation is included in that distribution. The separate `desktop` workspace keeps these dependencies out of the core and WASM workspace. A Linux manifest constraint selects the compatible `libc = "=0.2.189"` for GPUI's older `xattr` dependency; the constraint also applies to downstream resolution. A standalone consumer generates its own lockfile and verifies a single shared GPUI package identity. The other distributions below are reference alternatives, not supported interchangeable engines.
-
-| Integration target | Inspected dependency relationship |
-| --- | --- |
-| Zed GPUI | The upstream GPUI implementation at commit `e21ff1b368b074586e4dae0d9bbf15d5dd8a1476` is the architectural reference used below. |
-| `iamnbutler/gpuikit` | At commit `03006cfbfacdecbc1804e09048ffcd2ecf21f09e`, version `0.9.0` requires `gpui-unofficial` and its matching platform package at version `1.18`. |
-| Longbridge `gpui-kit` | At commit `0ab9cf4ed6d237457e66efc56c8ffcf915e8ce05`, its workspace pins `gpui-pre` and matching platform packages to `0.3.11`. |
-
-These are inspected revisions, not a compatibility matrix or a claim about the latest releases. The toolkit relationships come from the [gpuikit manifest](https://github.com/iamnbutler/gpuikit/blob/03006cfbfacdecbc1804e09048ffcd2ecf21f09e/Cargo.toml) and [Longbridge manifest](https://github.com/longbridge/gpui-kit/blob/0ab9cf4ed6d237457e66efc56c8ffcf915e8ce05/Cargo.toml).
-
-Matching import names do not make different distributions' `Entity`, `Context` or task types interchangeable. Use the chosen toolkit's compatible GPUI types. Supporting another distribution later may require a separately versioned adapter. The initial package should avoid a feature matrix that combines incompatible engines.
+The separate `desktop` workspace keeps toolkit dependencies out of the core and WASM workspace. The adapter has no direct libc dependency. A standalone consumer generates its own lockfile, verifies shared toolkit, engine and platform identities, and links against the adapter. This is the sole supported toolkit version.
 
 Keep desktop platform dependencies in the adapter or example. Preserve the core's declared Rust baseline and WASM build path. If the selected engine requires a different toolchain or platform checks, choose a separate desktop workspace or explicitly separated verification targets rather than raising the core's requirements implicitly.
 
@@ -97,7 +87,7 @@ Binding setup establishes an active registration, subscribes, stores the scoped 
 
 An rState subscriber runs synchronously during `Store::send`. Directly updating a GPUI entity through a captured async context at that point can attempt to borrow the app or entity while a GPUI handler is still using it. The binding callback must only mark its registration dirty and schedule work.
 
-The selected mechanism is a foreground job queued with `AsyncApp::spawn`. In the inspected implementation, spawning clones the async context and enqueues the future; entity updates borrow the app when performed. The job calls the weak entity's update operation and `cx.notify()` after the original handler returns. [GPUI async context implementation](https://github.com/zed-industries/zed/blob/e21ff1b368b074586e4dae0d9bbf15d5dd8a1476/crates/gpui/src/app/async_context.rs)
+The selected mechanism is a foreground job queued with `AsyncApp::spawn`. Spawning clones the async context and enqueues the future; entity updates borrow the app when performed. The job calls the weak entity's update operation and `cx.notify()` after the original handler returns. `AsyncApp::update` returns its callback result directly; app access after release can panic. Command scopes close automatically during orderly shutdown through a weak quit registration. Embeddings or tests releasing an app without shutdown must close or drop its scopes first. [Selected async context implementation](https://docs.rs/crate/gpui-pre/0.3.10/source/src/app/async_context.rs)
 
 Immediately detach the returned notification `Task`. Dropping the task handle cancels its work, so an ignored return value could cancel the job as soon as the subscriber returns and leave the target marked pending indefinitely. Detached notification jobs remain short and use the weak view and active registration guards to decide whether notification is still needed. Longer command tasks retain their separate ownership and cancellation policy. [GPUI task lifetime](https://github.com/zed-industries/zed/blob/e21ff1b368b074586e4dae0d9bbf15d5dd8a1476/crates/scheduler/src/executor.rs#L405)
 
@@ -177,7 +167,7 @@ LoadRequested → Loading state → GPUI task
 GPUI task → LoadSucceeded or LoadFailed → synchronous Store::send
 ```
 
-GPUI provides foreground and background executors. Owned request and result data crossing threads need the executor's `Send` requirements; stores, selections and `Rc` snapshots stay on the UI thread. [GPUI executors](https://github.com/zed-industries/zed/blob/e21ff1b368b074586e4dae0d9bbf15d5dd8a1476/crates/gpui/src/executor.rs)
+GPUI provides foreground and background executors. Owned request and result data crossing threads need the executor's `Send` requirements; stores, selections and `Rc` snapshots stay on the UI thread. [Selected GPUI executors](https://docs.rs/crate/gpui-pre/0.3.10/source/src/executor.rs)
 
 An effect submits work and returns `Ok(())`. Submissions from synchronous store callbacks enter a FIFO command queue; a foreground job enters GPUI and starts the work after the callback stack unwinds. Command submission order is preserved, while concurrently running tasks may complete out of order. The application runner owns task handles, awaits completion through GPUI and routes outcomes back to the appropriate manager. Never block the UI thread with `block_on` or move a whole store into background work. Avoid retaining an owning `EffectScope` merely to dispatch a later result; weak store access or the document manager gives the lifetime an explicit policy.
 

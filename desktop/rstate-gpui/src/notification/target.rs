@@ -3,7 +3,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use gpui::{AsyncApp, Context, WeakEntity};
+use gpui_kit::{AsyncApp, Context, WeakEntity};
 
 use crate::binding::Registration;
 

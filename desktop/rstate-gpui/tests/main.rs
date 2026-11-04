@@ -1,3 +1,5 @@
+extern crate gpui_kit as gpui;
+
 mod binding;
 mod command;
 mod dispatch;

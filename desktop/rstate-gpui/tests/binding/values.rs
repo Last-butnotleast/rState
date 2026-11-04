@@ -1,12 +1,12 @@
 use std::{cell::Cell, rc::Rc};
 
-use gpui::{AppContext, TestAppContext};
+use gpui_kit::{AppContext, TestAppContext};
 use rstate::{Store, StoreConfig, Update};
 use rstate_gpui::ViewBindings;
 
 use crate::support::{Event, counter, observe, view};
 
-#[gpui::test]
+#[gpui_kit::test]
 fn initial_reads_and_equal_changes_do_not_notify(cx: &mut TestAppContext) {
     let store = counter();
     let view = view(cx, &store, 1);
@@ -21,7 +21,7 @@ fn initial_reads_and_equal_changes_do_not_notify(cx: &mut TestAppContext) {
     assert!(view.read_with(cx, |view, _| Rc::ptr_eq(&first, &view.values[0].get())));
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn snapshot_history_binding_tracks_metadata_without_context_change(cx: &mut TestAppContext) {
     let store = counter();
     let mut history = None;
@@ -49,7 +49,7 @@ fn snapshot_history_binding_tracks_metadata_without_context_change(cx: &mut Test
     assert_eq!(notifications.get(), 2);
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn binding_has_no_clone_send_or_debug_bounds(cx: &mut TestAppContext) {
     struct Value(Rc<Cell<i32>>);
     struct Context(Value);
@@ -80,7 +80,7 @@ fn binding_has_no_clone_send_or_debug_bounds(cx: &mut TestAppContext) {
     assert_eq!(binding.get().0.get(), 8);
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn mapped_and_combined_bindings_read_coherent_latest_values(cx: &mut TestAppContext) {
     let store = counter();
     let source = store.select(|value| *value, PartialEq::eq);
@@ -109,7 +109,7 @@ fn mapped_and_combined_bindings_read_coherent_latest_values(cx: &mut TestAppCont
     assert_eq!(notifications.get(), 1);
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn available_undo_routes_validation_failure_without_notifying_or_changing_identity(
     cx: &mut TestAppContext,
 ) {

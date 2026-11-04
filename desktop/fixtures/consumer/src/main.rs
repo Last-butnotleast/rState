@@ -1,4 +1,4 @@
-use gpui::{App, Context};
+use gpui_kit::{App, Context};
 use rstate::{JsonCodec, Persistence, SnapshotStorage, Store, StoreConfig, StoreResult, Update};
 use rstate_gpui::{
     CommandPolicy, CommandScope, CommandSubmitError, PersistenceBinding, SelectionBinding,

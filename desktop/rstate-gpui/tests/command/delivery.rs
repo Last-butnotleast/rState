@@ -3,17 +3,15 @@ use std::{
     rc::Rc,
 };
 
-use gpui::TestAppContext;
+use gpui_kit::TestAppContext;
 use rstate::{DispatchStatus, StoreError};
 use rstate_gpui::{CommandPolicy, CommandScope};
 
 use super::support::unexpected;
 use crate::support::{Event, counter};
 
-#[gpui::test]
-fn completion_dispatch_is_synchronous_and_delivery_errors_keep_commit_status(
-    cx: &mut TestAppContext,
-) {
+#[gpui_kit::test]
+fn completion_dispatch_is_synchronous_and_delivery_errors_keep_commit_status(cx: &TestAppContext) {
     let store = counter();
     let weak = store.downgrade();
     let _guard = store
@@ -45,8 +43,8 @@ fn completion_dispatch_is_synchronous_and_delivery_errors_keep_commit_status(
     assert_eq!(errors[0].dispatch_status(), Some(DispatchStatus::Committed));
 }
 
-#[gpui::test]
-fn error_handler_can_close_scope_before_next_serial_command(cx: &mut TestAppContext) {
+#[gpui_kit::test]
+fn error_handler_can_close_scope_before_next_serial_command(cx: &TestAppContext) {
     let scope = Rc::new(cx.update(|cx| CommandScope::new(cx)));
     let channel = scope.channel(CommandPolicy::Serial);
     let owner = Rc::downgrade(&scope);

@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use gpui::{App, AsyncApp};
+use gpui_kit::{App, AsyncApp};
 
 use super::view::{Action, DocumentWindows};
 
@@ -12,9 +12,7 @@ pub async fn run(windows: DocumentWindows, cx: &mut AsyncApp) -> Result<(), Stri
     cx.background_executor()
         .timer(Duration::from_millis(250))
         .await;
-    let initial_renders = cx
-        .update(|cx| initial_render_count(&windows, cx))
-        .map_err(|error| error.to_string())??;
+    let initial_renders = cx.update(|cx| initial_render_count(&windows, cx))?;
 
     windows
         .list
@@ -23,8 +21,7 @@ pub async fn run(windows: DocumentWindows, cx: &mut AsyncApp) -> Result<(), Stri
     cx.background_executor()
         .timer(Duration::from_millis(150))
         .await;
-    cx.update(|cx| verify_shared_rename(&windows, initial_renders, cx))
-        .map_err(|error| error.to_string())??;
+    cx.update(|cx| verify_shared_rename(&windows, initial_renders, cx))?;
 
     for action in [Action::Delete, Action::Undo, Action::Redo, Action::Reset] {
         windows
@@ -32,24 +29,22 @@ pub async fn run(windows: DocumentWindows, cx: &mut AsyncApp) -> Result<(), Stri
             .update(cx, |view, _, cx| view.perform(action, cx))
             .map_err(|error| error.to_string())?;
     }
-    let weak = cx
-        .update(|cx| {
-            let detail = windows.detail.read(cx).map_err(|error| error.to_string())?;
-            require(
-                detail.row_count() == 3,
-                "Reset did not restore document rows",
-            )?;
-            require(
-                detail.selected_title().as_deref() == Some("First draft"),
-                "Reset did not restore selected detail",
-            )?;
-            require(
-                detail.error().is_none(),
-                "A domain action returned an error",
-            )?;
-            Ok::<_, String>(detail.store().downgrade())
-        })
-        .map_err(|error| error.to_string())??;
+    let weak = cx.update(|cx| {
+        let detail = windows.detail.read(cx).map_err(|error| error.to_string())?;
+        require(
+            detail.row_count() == 3,
+            "Reset did not restore document rows",
+        )?;
+        require(
+            detail.selected_title().as_deref() == Some("First draft"),
+            "Reset did not restore selected detail",
+        )?;
+        require(
+            detail.error().is_none(),
+            "A domain action returned an error",
+        )?;
+        Ok::<_, String>(detail.store().downgrade())
+    })?;
     windows
         .list
         .update(cx, |_, window, _| window.remove_window())
@@ -71,8 +66,7 @@ pub async fn run(windows: DocumentWindows, cx: &mut AsyncApp) -> Result<(), Stri
             weak.upgrade().is_some(),
             "Shared document released while its detail window remained",
         )
-    })
-    .map_err(|error| error.to_string())??;
+    })?;
     windows
         .detail
         .update(cx, |_, window, _| window.remove_window())
@@ -93,8 +87,7 @@ pub async fn run(windows: DocumentWindows, cx: &mut AsyncApp) -> Result<(), Stri
             independent.row_count() == 3,
             "Independent document did not survive shared document closure",
         )
-    })
-    .map_err(|error| error.to_string())??;
+    })?;
     println!(
         "Document smoke passed: three native windows rendered; shared rename/delete/history/reset and independent ownership verified"
     );

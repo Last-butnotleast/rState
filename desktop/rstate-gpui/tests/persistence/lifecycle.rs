@@ -1,11 +1,11 @@
-use gpui::{AppContext, TestAppContext};
+use gpui_kit::{AppContext, TestAppContext};
 use rstate_gpui::ViewBindings;
 
 use crate::support::{Event, View, counter, observe};
 
 use super::support::{Storage, store};
 
-#[gpui::test]
+#[gpui_kit::test]
 fn dropped_status_binding_does_not_erase_another_dirty_selection(cx: &mut TestAppContext) {
     let storage = Storage::default();
     let store = store(&storage).unwrap();
@@ -28,7 +28,7 @@ fn dropped_status_binding_does_not_erase_another_dirty_selection(cx: &mut TestAp
     assert_eq!(notifications.get(), 1);
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn status_binding_owns_store_but_released_entity_is_cleanup(cx: &mut TestAppContext) {
     let storage = Storage::default();
     let store = store(&storage).unwrap();
@@ -51,7 +51,7 @@ fn status_binding_owns_store_but_released_entity_is_cleanup(cx: &mut TestAppCont
     assert!(weak.upgrade().is_none());
 }
 
-#[gpui::test]
+#[gpui_kit::test]
 fn unconfigured_binding_fails_without_installing_a_registration(cx: &mut TestAppContext) {
     let store = counter();
     let view = cx.new(|cx| {

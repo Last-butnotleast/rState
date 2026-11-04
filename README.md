@@ -282,7 +282,7 @@ For native controls, reset and undo/redo check the proposed context before commi
 
 `conformance` owns shared scenario fixtures and their compatibility contract.
 
-`desktop/rstate-gpui` connects selections and persistence feedback to GPUI views with scoped bindings and deferred, shared notifications. Command scopes own foreground or background work with explicit concurrency, serialization, replacement and lifetime policies. Its separate desktop workspace keeps GPUI's platform dependencies and toolchain requirements out of the core and WASM workspace. See the [adapter guide](desktop/rstate-gpui/README.md) for the pinned engine, reusable APIs and desktop checks, and [GPUI_ADAPTER.md](GPUI_ADAPTER.md) for the integration design.
+`desktop/rstate-gpui` connects selections and persistence feedback to GPUI Kit 0.8.1 views with scoped bindings and deferred, shared notifications. Command scopes own foreground or background work with explicit concurrency, serialization, replacement and lifetime policies. Its separate desktop workspace keeps GPUI's platform dependencies and toolchain requirements out of the core and WASM workspace. See the [adapter guide](desktop/rstate-gpui/README.md) for the reusable APIs and desktop checks, and [GPUI_ADAPTER.md](GPUI_ADAPTER.md) for the integration design.
 
 ## Development
 

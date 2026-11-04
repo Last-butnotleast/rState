@@ -1,6 +1,6 @@
 use std::{fmt, rc::Rc};
 
-use gpui::App;
+use gpui_kit::App;
 
 use super::{CommandChannel, CommandPolicy, request::Lane, runner::Runner};
 
@@ -19,7 +19,7 @@ impl fmt::Debug for CommandScope {
 impl CommandScope {
     pub fn new(cx: &App) -> Self {
         Self {
-            inner: Rc::new(Runner::new(cx)),
+            inner: Runner::new(cx),
         }
     }
 
