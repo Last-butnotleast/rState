@@ -1,6 +1,6 @@
 # rstate
 
-A small synchronous Rust state store with typed events, shared snapshots, pure transitions, subscriptions, effects, emitted events, transition inspection, context selections, reusable factories, reset, snapshot history and synchronous snapshot persistence. The default library uses the Rust standard library and `thiserror`; the optional `json` feature adds a serialization adapter.
+A small synchronous Rust state store with typed events, shared snapshots, pure transitions, subscriptions, effects, emitted events, transition inspection, context selections, reusable factories, reset, snapshot history, synchronous snapshot persistence and opt-in validation. The default library uses the Rust standard library and `thiserror`; the optional `json` feature adds a serialization adapter.
 
 The selected behavior follows [`@xstate/store` 4.3.0 at commit `9b3a88f`](https://github.com/statelyai/xstate/tree/9b3a88fa43f4be5433797acfba18f27c40494bd2/packages/xstate-store). This is a core implementation, not a port of the complete package or its extensions.
 
@@ -194,9 +194,41 @@ Committed domain events and controls automatically save after successful subscri
 
 Automatic-save failures leave committed state intact, report through `Persistence::on_error` and `store.persistence_error()`, and do not turn the domain action into a storage error. `store.save()` explicitly retries the current context; `store.clear_storage()` removes saved data without resetting live state or history. Explicit operations return typed errors, including a busy error if called reentrantly from active storage I/O. A successful write clears the last reported persistence error. `save()` propagates a queued write failure and returns `PersistenceError::Superseded` if reentrant changes leave the current revision unpersisted.
 
+## Schemas and validation
+
+`StoreConfig::with_schemas` and `StoreFactory::with_schemas` attach typed `Schemas<Context, Event, Emitted>` metadata. Each optional context, event or emitted `Schema<T>` has a `SchemaMetadata` name and vendor and a synchronous check callback. `store.schemas()` exposes the configured schemas. Attaching schemas is inert: ordinary `Store::new`, factory `create`, and persisted constructors do not run schema checks.
+
+```rust
+use rstate::{Schema, SchemaCheck, SchemaMetadata, Schemas, ValidationIssue, ValidationOptions};
+
+let schemas = Schemas::default().with_context(Schema::new(
+    SchemaMetadata::new("nonnegative-counter"),
+    |context: &Counter| {
+        Ok(if context.count >= 0 {
+            SchemaCheck::Valid
+        } else {
+            SchemaCheck::invalid(vec![ValidationIssue::new("count must be nonnegative")])
+        })
+    },
+));
+let config = StoreConfig::new(Counter { count: 0 }, |_, _, _| Ok(Update::Keep))
+    .with_schemas(schemas);
+let validated: Store<Counter, Event> = Store::new_validated(config, ValidationOptions::default()).unwrap();
+```
+
+Runtime validation is enabled only through the explicit fallible `Store::new_validated(config, options)`, `Store::new_persisted_validated(config, persistence, options)`, `factory.create_validated(input, options)`, or `factory.create_persisted_validated(input, persistence, options)` constructors. Initialization failures return a typed error before exposing a store. A validated persisted constructor checks configured reset defaults before reading storage, then checks any loaded context before exposure; rejected data is not overwritten. Missing stored data uses the already-validated defaults.
+
+Checks run on the outer incoming event before the reducer, the final macrostep context, and collected emitted values in their existing order before state/history publication or effects. Internal `enqueue.trigger` event payloads bypass event validation, matching the pinned reference, while the final context and collected emissions remain checked. Successful schema outputs do not replace values: the reference also ignores Standard Schema `result.value`. Schema checks preserve context, snapshot, event and emitted identities and add no `Clone` or serialization bounds.
+
+`SchemaCheck::invalid(issues).named(name)` rejects a value with structured issues; `SchemaCheck::unknown(name)` classifies an unsupported event or emitted variant. A callback can return `Valid` for known variants without their own validation rule. `ValidationOptions` defaults to checking every scope and rejecting unknown event/emitted variants; individual scopes can be disabled and either unknown policy can be set to `UnknownPolicy::Ignore`. `ValidationIssue` paths contain explicit `PathSegment::Field` and `PathSegment::Index` values. Returning `Unknown` from a context schema rejects the context.
+
+Validation failures return `StoreError::Validation` with `ValidationError` fields for stage, reason, schema metadata, optional value name and issues. The error is available through `StoreError::validation_error()` and `Error::source()`, without retaining the original context or payload. Provider failures returned as unrelated `StoreError` values propagate unchanged. `can` returns false for validation failures and propagates other errors. Pure `transition` and `can` run checks but do not commit state/history, notify, inspect, execute effects or write storage; schema callbacks must remain pure like reducers.
+
+For native controls, reset and undo/redo check the proposed context before committing, without inventing a domain event. This protects the validated-store invariant even when schema rules capture changing application configuration. Structural `can_undo` and `can_redo` report history availability, while a subsequent restore can still fail validation. Rejected controls leave current state, history and storage unchanged. Validating configured defaults, hydrated state and native controls is an explicit native composition policy; arbitrary upstream extension ordering is not reproduced. Async validators and JSON Schema interpretation are outside this typed synchronous interface.
+
 ## Layout
 
-`crates/rstate/src` composes focused state, transition, effects, observation, store, control, history and persistence domains. Native behavior tests live in the separate mirrored `crates/rstate/tests` tree and use a single explicit Cargo integration-test target. No handwritten code comments or inline test modules are used.
+`crates/rstate/src` composes focused state, transition, effects, observation, store, control, history, persistence, schema and validation domains. Native behavior tests live in the separate mirrored `crates/rstate/tests` tree and use a single explicit Cargo integration-test target. No handwritten code comments or inline test modules are used.
 
 `crates/rstate-wasm` is an unpublished browser test adapter. `test-app` runs real Rust/WASM and the pinned JavaScript reference over matching scenarios. It is development tooling, not a general JavaScript SDK.
 
@@ -221,4 +253,4 @@ See the test app's README for browser setup, building the WASM adapter and runni
 
 ## Current boundary
 
-The core is intentionally single-threaded and synchronous. Selection composition uses explicit one- or two-source dependencies; automatic dependency discovery and general atom APIs remain outside the implementation scope. Async/source atoms, managed async effects, runtime validation and XState actor integration remain outside scope. History uses bounded snapshots; event replay, grouping, filters and custom restore effects are deferred. Persistence saves full context synchronously; async storage, event logs, partial merges, migrations, throttling and broadcast are deferred. Transition inspection emits callbacks only and does not implement the XState actor inspection protocol.
+The core is intentionally single-threaded and synchronous. Selection composition uses explicit one- or two-source dependencies; automatic dependency discovery and general atom APIs remain outside the implementation scope. Async/source atoms, managed async effects and XState actor integration remain outside scope. History uses bounded snapshots; event replay, grouping, filters and custom restore effects are deferred. Persistence saves full context synchronously; async storage, event logs, partial merges, migrations, throttling and broadcast are deferred. Validation uses typed synchronous callbacks; automatic value transformation, asynchronous validators and a general schema language are deferred. Transition inspection emits callbacks only and does not implement the XState actor inspection protocol.

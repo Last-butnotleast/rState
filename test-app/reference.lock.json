@@ -53,6 +53,11 @@
       "source": "packages/xstate-store/src/persist.ts",
       "target": "src/persist.ts",
       "sha256": "879935a50eb242c9e2128e8bb89c8a7193fd712bf8d14e42f353d58ae84a2ca2"
+    },
+    {
+      "source": "packages/xstate-store/src/validate.ts",
+      "target": "src/validate.ts",
+      "sha256": "38c97ed57c732533b98571228a01319c22c41f537226e896deabbac77bffb3f4"
     }
   ]
 }

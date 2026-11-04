@@ -21,6 +21,9 @@ export default defineConfig({
       "@reference/persist": fileURLToPath(
         new URL("./.reference/src/persist.ts", import.meta.url),
       ),
+      "@reference/validate": fileURLToPath(
+        new URL("./.reference/src/validate.ts", import.meta.url),
+      ),
     },
   },
   server: { host: "127.0.0.1", port: 4173, strictPort: true },

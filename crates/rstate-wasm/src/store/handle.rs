@@ -188,5 +188,9 @@ pub(super) fn invoke(callback: &Function, value: &Value) -> StoreResult {
 }
 
 pub(super) fn error(value: &StoreError) -> JsValue {
-    js_sys::Error::new(&value.to_string()).into()
+    let error = js_sys::Error::new(&value.to_string());
+    if let Some(validation) = value.validation_error() {
+        super::validation::error::annotate(&error, validation);
+    }
+    error.into()
 }

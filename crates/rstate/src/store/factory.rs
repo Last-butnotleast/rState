@@ -1,6 +1,6 @@
 use std::{fmt, rc::Rc};
 
-use crate::{Enqueue, Store, StoreConfig, StoreResult, Update, transition::Reducer};
+use crate::{Enqueue, Schemas, Store, StoreConfig, StoreResult, Update, transition::Reducer};
 
 type Initializer<I, C> = dyn Fn(I) -> StoreResult<C>;
 
@@ -8,6 +8,7 @@ pub struct StoreFactory<I, C, E, M = ()> {
     initializer: Rc<Initializer<I, C>>,
     reducer: Rc<Reducer<C, E, M>>,
     history_limit: Option<usize>,
+    schemas: Schemas<C, E, M>,
 }
 
 impl<I, C, E, M> Clone for StoreFactory<I, C, E, M> {
@@ -16,6 +17,7 @@ impl<I, C, E, M> Clone for StoreFactory<I, C, E, M> {
             initializer: self.initializer.clone(),
             reducer: self.reducer.clone(),
             history_limit: self.history_limit,
+            schemas: self.schemas.clone(),
         }
     }
 }
@@ -35,6 +37,7 @@ impl<I, C, E, M> StoreFactory<I, C, E, M> {
             initializer: Rc::new(initializer),
             reducer: Rc::new(reducer),
             history_limit: None,
+            schemas: Schemas::default(),
         }
     }
 
@@ -42,6 +45,16 @@ impl<I, C, E, M> StoreFactory<I, C, E, M> {
     pub const fn with_history(mut self, limit: usize) -> Self {
         self.history_limit = Some(limit);
         self
+    }
+
+    #[must_use]
+    pub fn with_schemas(mut self, schemas: Schemas<C, E, M>) -> Self {
+        self.schemas = schemas;
+        self
+    }
+
+    pub const fn schemas(&self) -> &Schemas<C, E, M> {
+        &self.schemas
     }
 }
 
@@ -56,6 +69,7 @@ impl<I, C: 'static, E: 'static, M: 'static> StoreFactory<I, C, E, M> {
             initial,
             reducer: self.reducer.clone(),
             history_limit: self.history_limit,
+            schemas: self.schemas.clone(),
         })
     }
 }

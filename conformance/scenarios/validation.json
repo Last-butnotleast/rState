@@ -1,0 +1,29 @@
+{
+  "name": "Validation rejects events, final contexts and emissions atomically",
+  "configuration": {},
+  "steps": [
+    { "op": "metadata" },
+    { "op": "subscribe" },
+    { "op": "inspect" },
+    { "op": "can", "event": { "type": "inc", "by": 2 } },
+    { "op": "transition", "event": { "type": "inc", "by": 2 } },
+    { "op": "send", "event": { "type": "inc", "by": 2 } },
+    { "op": "can", "event": { "type": "inc", "by": -1 } },
+    { "op": "send", "event": { "type": "inc", "by": -1 } },
+    { "op": "send", "event": { "type": "inc", "by": 5 } },
+    { "op": "can", "event": { "type": "inc", "by": 4 } },
+    { "op": "transition", "event": { "type": "inc", "by": 4 } },
+    { "op": "send", "event": { "type": "inc", "by": 4 } },
+    { "op": "send", "event": { "type": "add", "price": 2 } },
+    { "op": "send", "event": { "type": "add", "price": 2 } },
+    { "op": "send", "event": { "type": "recalculate" } },
+    { "op": "send", "event": { "type": "receipt" } },
+    { "op": "send", "event": { "type": "unknown" } },
+    { "op": "can", "event": { "type": "fail" } },
+    { "op": "send", "event": { "type": "fail" } },
+    { "op": "can", "event": { "type": "keep" } },
+    { "op": "send", "event": { "type": "keep" } },
+    { "op": "send", "event": { "type": "equal" } },
+    { "op": "snapshot" }
+  ]
+}

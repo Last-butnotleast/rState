@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::{ControlAction, HistoryStatus, Snapshot, StoreResult};
+use crate::{ControlAction, HistoryStatus, Snapshot, StoreResult, ValidationStage};
 
 use super::{Store, commit::Action};
 
@@ -15,6 +15,7 @@ impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
     ) -> StoreResult<()> {
         let previous = self.get_snapshot();
         let context = reset(&self.inner.defaults, &previous.context)?;
+        self.validate_context(&context, ValidationStage::Context)?;
         let snapshot = Rc::new(previous.record(context, self.inner.history_limit));
         self.commit(snapshot, &Action::Control(ControlAction::Reset), Vec::new())
     }
@@ -52,6 +53,7 @@ impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
                 history: Some(Rc::new(history)),
             })
         });
+        self.validate_context(&snapshot.context, ValidationStage::Context)?;
         self.commit(snapshot, &Action::Control(action), Vec::new())
     }
 }

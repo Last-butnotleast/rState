@@ -2,6 +2,7 @@ mod context;
 mod counter;
 mod factory;
 mod ordering;
+mod validation;
 
 use std::rc::Rc;
 
@@ -10,6 +11,7 @@ use serde_json::Value;
 
 pub use context::{Context, Event, Message};
 pub use factory::definition as factory;
+pub use validation::configuration as validation_configuration;
 
 pub type Recorder = Rc<dyn Fn(Value) -> StoreResult>;
 pub type Fixture = Store<Context, Event, Message>;

@@ -12,7 +12,7 @@ impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
     ) -> StoreResult<Self> {
         let state = Rc::new(PersistenceState::new(persistence));
         let initial = state.load()?.unwrap_or_else(|| config.initial.clone());
-        Ok(Self::from_parts(config, initial, Some(state)))
+        Ok(Self::from_parts(config, initial, Some(state), None))
     }
 
     pub fn save(&self) -> StoreResult<()> {

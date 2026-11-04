@@ -1,4 +1,4 @@
 mod handle;
-mod storage;
+pub(super) mod storage;
 
 pub use handle::FixtureControls;

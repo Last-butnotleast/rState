@@ -22,6 +22,11 @@ declare module "@reference/store" {
   ) => Context | void;
   type Result = [SourceSnapshot, unknown[]] & { _allowed?: boolean };
   export type SourceStore = {
+    schemas?: {
+      context?: unknown;
+      events?: Record<string, unknown>;
+      emitted?: Record<string, unknown>;
+    };
     with(extension: unknown): SourceStore;
     send(event: Event): void;
     getSnapshot(): SourceSnapshot;
@@ -41,11 +46,26 @@ declare module "@reference/store" {
   export function createStore(config: {
     context: Context;
     on: Record<string, Handler>;
+    schemas?: {
+      context?: unknown;
+      events?: Record<string, unknown>;
+      emitted?: Record<string, unknown>;
+    };
   }): SourceStore;
   export function createStoreLogic(config: {
     context: (input: { count: number }) => Context;
     on: Record<string, Handler>;
   }): { createStore(input: { count: number }): SourceStore };
+}
+
+declare module "@reference/validate" {
+  export function validateSchemas(options?: {
+    context?: boolean;
+    events?: boolean;
+    emitted?: boolean;
+    unknownEvents?: "throw" | "ignore";
+    unknownEmitted?: "throw" | "ignore";
+  }): unknown;
 }
 
 declare module "@reference/atom" {

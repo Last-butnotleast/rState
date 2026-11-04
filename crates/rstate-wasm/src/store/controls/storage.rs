@@ -4,7 +4,7 @@ use js_sys::Function;
 use rstate::{SnapshotStorage, StoreError, StoreResult};
 use wasm_bindgen::JsValue;
 
-pub(super) struct CallbackStorage {
+pub(in crate::store) struct CallbackStorage {
     pub read: Function,
     pub write: Function,
     pub remove: Function,

@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::persistence::PersistenceState;
-use crate::{Snapshot, StoreConfig, StoreResult, Subscription};
+use crate::{Schemas, Snapshot, StoreConfig, StoreResult, Subscription, ValidationOptions};
 use crate::{
     observation::Emissions, observation::Inspectors, observation::Observers, transition::Reducer,
 };
@@ -42,6 +42,8 @@ pub struct StoreInner<C, E, M> {
     pub(crate) history_limit: Option<usize>,
     pub(crate) revision: Rc<Cell<u64>>,
     pub(crate) persistence: Option<Rc<PersistenceState<C>>>,
+    pub(crate) schemas: Schemas<C, E, M>,
+    pub(crate) validation: Option<ValidationOptions>,
 }
 
 impl<C, E, M> Clone for Store<C, E, M> {
@@ -55,13 +57,14 @@ impl<C, E, M> Clone for Store<C, E, M> {
 impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
     pub fn new(config: StoreConfig<C, E, M>) -> Self {
         let initial = config.initial.clone();
-        Self::from_parts(config, initial, None)
+        Self::from_parts(config, initial, None, None)
     }
 
     pub(crate) fn from_parts(
         config: StoreConfig<C, E, M>,
         initial: Rc<C>,
         persistence: Option<Rc<PersistenceState<C>>>,
+        validation: Option<ValidationOptions>,
     ) -> Self {
         let snapshot = Rc::new(Snapshot::initial(initial, config.history_limit));
         let revision = persistence
@@ -79,6 +82,8 @@ impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
                 history_limit: config.history_limit,
                 revision,
                 persistence,
+                schemas: config.schemas,
+                validation,
             }),
         }
     }
@@ -115,5 +120,9 @@ impl<C: 'static, E: 'static, M: 'static> Store<C, E, M> {
 
     pub fn on_any(&self, listener: impl Fn(Rc<M>) -> StoreResult<()> + 'static) -> Subscription {
         self.inner.emissions.on_any(listener)
+    }
+
+    pub fn schemas(&self) -> &Schemas<C, E, M> {
+        &self.inner.schemas
     }
 }

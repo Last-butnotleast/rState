@@ -6,6 +6,7 @@ mod handle;
 mod inspection;
 mod persistence;
 mod selection;
+mod validation;
 mod weak;
 
 pub use factory::StoreFactory;
