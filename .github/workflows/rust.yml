@@ -28,5 +28,9 @@ jobs:
         run: cargo clippy --locked -p rstate-wasm --target wasm32-unknown-unknown --all-features -- -D warnings
       - name: Check the minimal core for WebAssembly
         run: cargo check --locked -p rstate --no-default-features --target wasm32-unknown-unknown
+      - name: Check serialization without a JSON adapter for WebAssembly
+        run: cargo check --locked -p rstate --no-default-features --features serde --target wasm32-unknown-unknown
+      - name: Test the minimal core
+        run: cargo test --locked -p rstate --no-default-features
       - name: Test the workspace
         run: cargo test --locked --workspace --all-features

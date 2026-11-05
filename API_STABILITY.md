@@ -51,6 +51,12 @@ These types represent complete application-facing choices or a concrete intercha
 
 `SnapshotStorage` and `SnapshotCodec` remain open traits intended for application implementations. New required methods or changed signatures require a major-version review; compatible new behavior should use defaults or separate optional interfaces.
 
+## Versioned context restoration
+
+`Persisted<C>` keeps its existing closed `{ context, version: u64 }` construction and serialization shape. Its optional Serde implementations require `serde`; the existing `json` feature includes that feature and continues to encode the same shape. Application context bounds remain local to serialization operations.
+
+`Persisted::into_snapshot(expected_version)` consumes an envelope and returns `StoreResult<Rc<Snapshot<C>>>` without context trait bounds or store initialization. A mismatch retains the existing typed `PersistenceError::VersionMismatch` source and carries no dispatch status. Successful restoration creates a shared snapshot with no history and does not invoke schema callbacks. Application-defined typed migrations run before this version check; codecs may apply those same migrations before returning a target-version envelope to the unchanged store loader. No automatic migration registry or storage policy is introduced.
+
 ## Stateless transition boundary
 
 `Transition<C, E, M>` is a cloneable reducer definition created without an initial context or store lifecycle. `transition(&Rc<Snapshot<C>>, E)` returns the existing `StoreResult<TransitionResult<C, E, M>>`. Its opaque representation and `Debug` implementation add no application trait bounds. Reducers and optional schema callbacks are shared across clones; the handle owns no current snapshot, subscribers, persistence or history configuration.
@@ -62,6 +68,14 @@ This is a native API extension analogous to the reference's standalone transitio
 `TransitionResult::into_commands` returns `Result<CommandResult<C, M>, TransitionResult<C, E, M>>`. The success record contains the existing proposed snapshot, `Vec<Rc<M>>` commands and availability. It reuses emitted values without additional generic bounds. A proposal containing any executable callback is returned intact as the error value; conversion cannot silently omit executable effects. Payload serialization remains application-owned and optional.
 
 `Transition::outcome` classifies the existing result into `Applied`, `Unavailable` or `ValidationFailed`. Validation outcomes retain the original `StoreError` and source; operational callback failures remain `Err`. `outcome_with_guard` also accepts a per-call `FnOnce(&Snapshot<C>, &E) -> Result<(), R>` and reports `Rejected { reason: R }` before validation or reduction. The guard runs once for the outer event, adds no trait bounds to its reason and does not change internal-trigger behavior. Rejected and invalid outcomes expose no effects. Input snapshots remain externally owned, with the same purity and interior-mutation qualifications as ordinary transitions. These structured queries leave existing Store APIs, availability, effects and validation behavior unchanged.
+
+## Replay boundary
+
+`replay` and `replay_with_guard` take an initial `Rc<Snapshot<C>>`, an `IntoIterator<Item = E>` and an explicit `ReplayPolicy`. The guard variant adds `FnMut(&Snapshot<C>, &E) -> Result<(), R>` and delegates each outer event to the existing guarded outcome API. The utility introduces no application `Clone`, serialization, thread-safety or static-lifetime bounds. Conditional `Debug` on `ReplayResult` follows the output types' existing context and rejection-reason requirements without adding event or command bounds.
+
+`ReplayPolicy` is a closed enum with `Stop` and `Skip`; its default is `Stop`. Both policies retain non-applied outcomes. `Stop` includes the stopping outcome and does not request another iterator item; `Skip` continues from the last applied snapshot. A non-validation callback error always returns `Err(StoreError)` with its original source and no dispatch status, discarding partial proposals. `ReplayResult` is a non-exhaustive output record with readable `snapshot` and ordered `outcomes` fields. Empty replay preserves the initial snapshot identity.
+
+Replay retains applied effects without executing them and adds no publication, persistence, runtime or history behavior. It shares ordinary transitions' purity, snapshot identity, internal-trigger and validation contracts. The caller owns event storage and durable command interpretation.
 
 ## Snapshot selection boundary
 

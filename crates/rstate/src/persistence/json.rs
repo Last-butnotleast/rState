@@ -1,6 +1,6 @@
 use std::{fmt, marker::PhantomData};
 
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{StoreError, StoreResult};
 
@@ -38,23 +38,12 @@ impl<C> fmt::Debug for JsonCodec<C> {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-struct Envelope<C> {
-    context: C,
-    version: u64,
-}
-
 impl<C: Serialize + DeserializeOwned> SnapshotCodec<C> for JsonCodec<C> {
     fn encode(&self, context: &C, version: u64) -> StoreResult<Vec<u8>> {
-        serde_json::to_vec(&Envelope { context, version }).map_err(StoreError::from_error)
+        serde_json::to_vec(&Persisted { context, version }).map_err(StoreError::from_error)
     }
 
     fn decode(&self, bytes: &[u8]) -> StoreResult<Persisted<C>> {
-        let envelope: Envelope<C> =
-            serde_json::from_slice(bytes).map_err(StoreError::from_error)?;
-        Ok(Persisted {
-            context: envelope.context,
-            version: envelope.version,
-        })
+        serde_json::from_slice(bytes).map_err(StoreError::from_error)
     }
 }

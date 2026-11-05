@@ -9,7 +9,8 @@ autotests = false
 
 [features]
 default = []
-json = ["dep:serde", "dep:serde_json"]
+serde = ["dep:serde"]
+json = ["serde", "dep:serde_json"]
 
 [dependencies]
 thiserror.workspace = true

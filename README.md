@@ -1,6 +1,6 @@
 # rstate
 
-A small synchronous Rust state store with typed events, shared snapshots, stateless transitions, subscriptions, effects, emitted events, transition inspection, context selections, reusable factories, reset, snapshot history, synchronous snapshot persistence and opt-in validation. The default library uses the Rust standard library and `thiserror`; the optional `json` feature adds a serialization adapter.
+A small synchronous Rust state store with typed events, shared snapshots, stateless transitions, subscriptions, effects, emitted events, transition inspection, context selections, reusable factories, reset, snapshot history, synchronous snapshot persistence and opt-in validation. The default library uses the Rust standard library and `thiserror`. The optional `serde` feature makes versioned context envelopes serializable; `json` includes it and adds a JSON codec.
 
 The selected behavior follows [`@xstate/store` 4.3.0 at commit `9b3a88f`](https://github.com/statelyai/xstate/tree/9b3a88fa43f4be5433797acfba18f27c40494bd2/packages/xstate-store). This is a core implementation, not a port of the complete package or its extensions.
 
@@ -156,7 +156,7 @@ Attach typed schema metadata with `with_schemas(schemas)` and opt into checks wi
 
 For a database transaction, load a row into a snapshot, calculate a proposal, check `allowed` and errors, then persist the proposed context and application outputs within that transaction. The database owns commit and rollback. Queued `Effect::Emit` values are inspectable typed data; `Effect::Run` callbacks remain unexecuted and should not be used as durable commands. Native tests exercise this load/evaluate/commit pattern, including aborted proposals. A pinned SpacetimeDB SDK example remains a separate integration step.
 
-The core already supports `default-features = false` without serialization adapters, async runtimes or background threads. CI checks that configuration for `wasm32-unknown-unknown`; this is a core compilation check, with SpacetimeDB SDK compatibility to be verified by its integration example.
+Use `rstate = { version = "0.1", default-features = false }` for the existing minimal configuration. Its only required dependency is `thiserror`; no filesystem, network, async runtime or background thread is required. Store observation and persistence APIs remain available without initializing them when using pure transitions. CI runs native tests without default features and checks both the minimal core and optional `serde` configuration for `wasm32-unknown-unknown`. These checks use the Rust standard library; they do not promise `no_std` support. SpacetimeDB SDK compatibility is verified separately by its integration example.
 
 ## Declarative commands and transition outcomes
 
@@ -199,6 +199,31 @@ Applications can derive Serde traits on their command enums and serialize refere
 `Transition::outcome(snapshot, event)` wraps the existing pure transition with explicit `TransitionOutcome` variants. `Applied { result }` retains the proposed snapshot and effects, including command-only transitions and explicit same-context replacements. `Unavailable` means the existing `allowed` result was false. `ValidationFailed { error }` retains the original `StoreError`, its validation stage/details and source. Other reducer or schema-provider failures remain `Err(StoreError)`. Pure-query errors carry no dispatch status.
 
 `outcome_with_guard(snapshot, event, guard)` additionally accepts an application closure returning `Result<(), Reason>`. A failed guard returns `Rejected { reason }` before validators or reducers run, with no proposal or executable effects. Reasons can be application types without error, cloning, serialization or thread-safety bounds. The guard receives the externally supplied snapshot and outer event once; internal triggered events retain existing reduction and validation semantics. It may reenter synchronously. A successful guard is followed by the ordinary validation and transition path. Neither method modifies the supplied snapshot, and availability continues to describe reducer behavior rather than enforcing a lifecycle model.
+
+## Replaying ordered events
+
+`replay` applies an ordered event sequence to an externally supplied initial snapshot through the existing pure transition API. Each applied outcome becomes the next input snapshot. The result retains the final snapshot and every evaluated outer event's `TransitionOutcome` in order, including each applied proposal's unexecuted effects and typed command data.
+
+```rust
+use std::rc::Rc;
+use rstate::{ReplayPolicy, Snapshot, Transition, Update, replay};
+
+let counter: Transition<i32, i32> = Transition::new(|count: &Rc<i32>, by, _| {
+    Ok(Update::replace(count.saturating_add(*by)))
+});
+let initial = Rc::new(Snapshot::new(Rc::new(10)));
+let replayed = replay(&counter, initial.clone(), [2, 3], ReplayPolicy::Stop).unwrap();
+
+assert_eq!(*initial.context, 10);
+assert_eq!(*replayed.snapshot.context, 15);
+assert_eq!(replayed.outcomes.len(), 2);
+```
+
+Pass an explicit `ReplayPolicy`. `Stop`, also the policy's default, returns after the first `Unavailable`, `Rejected` or `ValidationFailed` outcome and includes that stopping outcome. It does not request later iterator items. `Skip` retains these outcomes and continues from the last applied snapshot. An empty sequence returns the original snapshot handle and no outcomes. Ordinary reducer or schema-provider errors always abort with the original `StoreError` and no dispatch status; partial proposals are discarded rather than returned as a successful replay.
+
+`replay_with_guard(transition, initial, events, policy, guard)` uses a per-event `FnMut(&Snapshot<C>, &E) -> Result<(), Reason>`. The guard sees the latest applied snapshot and runs once for each evaluated outer event before its validators and reducer. Internal triggers keep their existing FIFO behavior and do not invoke this outer guard. A rejected event cannot replace the current replay snapshot or contribute effects. Guard reasons and application types require no `Clone`, serialization, thread-safety or static-lifetime bounds from replay.
+
+Replay never executes queued callbacks or emissions, publishes state, notifies subscriptions or invokes persistence. Applied outcomes retain their full effect lists; emissions-only proposals can be consumed with `into_commands`. Results are reproducible for the same initial context and ordered inputs when reducers, validators, guards and input iteration are pure and contexts are immutable. Snapshot and context identity follow ordinary transition rules within each run. Replay records no undo history and provides no event storage or event-sourcing infrastructure.
 
 ## Reusing store behavior
 
@@ -289,6 +314,50 @@ Every successfully evaluated outer domain event records its pre-state, including
 
 State and history commit together before notifications, followed by inspection, persistence and user effects. Subscriber or inspector errors retain committed history and stop later pipeline stages. Reentrant commits retain each dispatch's inspection snapshot. Reset is undoable when history is enabled.
 
+## Versioned snapshot envelopes
+
+`Persisted<C> { context, version }` is the versioned full-context contract shared by codecs and externally managed snapshots. Its version is a `u64`. Enable `serde` for its conditional `Serialize` and `Deserialize` implementations, or enable `json` for those implementations and `JsonCodec`. Other core types gain no serialization bounds. Serializing `Persisted { context: snapshot.context.as_ref(), version }` borrows the context without cloning it or serializing history, subscribers or effects.
+
+`persisted.into_snapshot(expected_version)` restores a context into a new shared snapshot without creating a store or reading storage. It rejects a mismatching version with the existing `PersistenceError::VersionMismatch` as the `StoreError` source. Restoration does not validate context schemas or reconstruct history; apply application validation before committing the restored state when needed.
+
+Applications own migration rules and the supported source versions. A migration can change context types and return its own errors before checked restoration:
+
+```rust
+use rstate::{Persisted, StoreError, StoreResult};
+
+struct LegacyCounter {
+    count: i64,
+    label: String,
+}
+
+struct CurrentCounter {
+    count: u64,
+    label: String,
+}
+
+fn migrate(saved: Persisted<LegacyCounter>) -> StoreResult<Persisted<CurrentCounter>> {
+    if saved.version != 1 {
+        return Err(StoreError::new(format!("unsupported snapshot version {}", saved.version)));
+    }
+    Ok(Persisted {
+        context: CurrentCounter {
+            count: u64::try_from(saved.context.count).map_err(StoreError::from_error)?,
+            label: saved.context.label,
+        },
+        version: 2,
+    })
+}
+
+let saved = Persisted {
+    context: LegacyCounter { count: 12, label: "queued".into() },
+    version: 1,
+};
+let restored = migrate(saved).unwrap().into_snapshot(2).unwrap();
+assert_eq!(restored.context.count, 12);
+```
+
+Deserialize into the appropriate historical type, or an application-defined version-dispatch representation, before applying the migration. Unknown versions and failed conversions remain errors; rState does not select migrations, alter database schemas or overwrite stored bytes. A custom `SnapshotCodec` can run the same application migration during store hydration and return a `Persisted<Current>` with the configured target version. The existing loader still checks that returned version. `JsonCodec` keeps the existing `{ "context": ..., "version": ... }` wire shape and does not migrate automatically.
+
 ## Synchronous snapshot persistence
 
 `Persistence::new(name, version, storage, codec)` supplies a synchronous `SnapshotStorage` byte adapter and `SnapshotCodec<Context>`. `Store::new_persisted(config, persistence)` and `factory.create_persisted(input, persistence)` load before exposing the store. Missing data uses configured defaults; storage, decoding and version failures return typed errors without overwriting saved data. Enable the optional `json` feature for `JsonCodec`; other codecs add no global serialization bounds.
@@ -376,4 +445,4 @@ See the test app's README for browser setup, building the WASM adapter and runni
 
 ## Current boundary
 
-The core is intentionally single-threaded and synchronous. Selection composition uses explicit one- or two-source dependencies; automatic dependency discovery and general atom APIs remain outside the implementation scope. Async/source atoms, managed async effects and XState actor integration remain outside scope. History uses bounded snapshots; event replay, grouping, filters and custom restore effects are deferred. Persistence saves full context synchronously; async storage, event logs, partial merges, migrations, throttling and broadcast are deferred. Validation uses typed synchronous callbacks; automatic value transformation, asynchronous validators and a general schema language are deferred. Transition inspection emits callbacks only and does not implement the XState actor inspection protocol.
+The core is intentionally single-threaded and synchronous. Selection composition uses explicit one- or two-source dependencies; automatic dependency discovery and general atom APIs remain outside the implementation scope. Async/source atoms, managed async effects and XState actor integration remain outside scope. History uses bounded snapshots; undo/history based on event replay, grouping, filters and custom restore effects are deferred. The pure replay utility evaluates externally supplied events without providing history or event storage. Persistence saves full context synchronously; async storage, event logs, partial merges, automatic migration frameworks, throttling and broadcast are deferred. Validation uses typed synchronous callbacks; automatic value transformation, asynchronous validators and a general schema language are deferred. Transition inspection emits callbacks only and does not implement the XState actor inspection protocol.

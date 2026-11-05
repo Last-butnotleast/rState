@@ -25,7 +25,8 @@ pub use schema::{Schema, SchemaCheck, SchemaMetadata, Schemas};
 pub use state::Snapshot;
 pub use store::{Store, StoreFactory, WeakStore};
 pub use transition::{
-    CommandResult, StoreConfig, Transition, TransitionOutcome, TransitionResult, Update,
+    CommandResult, ReplayPolicy, ReplayResult, StoreConfig, Transition, TransitionOutcome,
+    TransitionResult, Update, replay, replay_with_guard,
 };
 pub use validation::{
     PathSegment, UnknownPolicy, ValidationError, ValidationIssue, ValidationOptions,
